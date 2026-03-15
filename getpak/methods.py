@@ -132,8 +132,8 @@ class Methods:
         '''
         try:
             # No need to print or log, the functions should handle it internally.
-            GRS.grs_dict = GRS.get_grs_dict(grs_nc, grs_version)
-            GRS.gpd_feature_dict = GRS._get_shp_features(vector_shp, unique_key=unique_shp_key)
+            GRS.grs_dict, _, _, _ = GRS.get_grs_dict(grs_nc, grs_version)  # grs, meta, proj, trans
+            GRS.gpd_feature_dict = GRS._get_shp_features(shp_file=vector_shp, unique_key=unique_shp_key)
 
         except Exception as e:
             # self.log.error(f'Error: {e}')
@@ -142,19 +142,20 @@ class Methods:
         # Initialize the dict and fill it with zeros
         # This will be converted to a pd.DataFrame later
         pt_stats = {}
-        for band in GRS.grs_v20nc_s2bands.keys():
-            pt_stats[GRS.grs_v20nc_s2bands[band]] = {id: 0.0 for id in GRS.gpd_feature_dict.keys()}
+        for band in dd.grs_v20nc_s2bands.keys():
+            pt_stats[dd.grs_v20nc_s2bands[band]] = {id: 0.0 for id in GRS.gpd_feature_dict.keys()}
 
         # Declare a list to hold delayed tasks
         tasks = []
 
         # Create delayed tasks for each combination of band and shapefile point
         for band in dd.grs_v20nc_s2bands.keys():
-            for id in dd.gpd_feature_dict.keys():
+            for id in GRS.gpd_feature_dict.keys():
                 # Get the shape feature
-                shp_feature = dd.gpd_feature_dict[id]
+                shp_feature = GRS.gpd_feature_dict[id]
                 # Create a delayed task
-                task = delayed(GRS._process_band_point)(band, shp_feature, shp_feature.crs, id)
+                grs_raster_band = GRS.grs_dict[band]
+                task = delayed(GRS._process_band_point)(grs_raster_band, band, shp_feature, id, shp_feature.crs)
                 tasks.append(task)
 
         global counter

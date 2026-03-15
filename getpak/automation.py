@@ -48,10 +48,14 @@ class Pipelines:
     @property
     def compute_l2b(self):
         return self.settings.get('processing', 'compute_l2b')['compute_l2b']
-    
+        
     @property
     def make_report(self):
         return self.settings.get('processing','make_report')['make_report']
+        # TO-DO return _as_bool(self.settings['processing']['make_report'])
+    @property
+    def report_rrs(self):
+        return self.settings.get('processing','report_rrs')['report_rrs']
 
     @property
     def tile_id(self):
@@ -152,8 +156,16 @@ class Pipelines:
         Path(os.path.join(imgs_out, "Chla")).mkdir(parents=True, exist_ok=True)
         Path(os.path.join(imgs_out, "Turb")).mkdir(parents=True, exist_ok=True)
         Path(os.path.join(imgs_out, "HySPM")).mkdir(parents=True, exist_ok=True)
-        Path(os.path.join(imgs_out, "Red")).mkdir(parents=True, exist_ok=True)
-        Path(os.path.join(imgs_out, "Nir2")).mkdir(parents=True, exist_ok=True)
+        # Rrs bands
+        if self.report_rrs == 'True':
+            Path(os.path.join(imgs_out, "Aerosol")).mkdir(parents=True, exist_ok=True)
+            Path(os.path.join(imgs_out, "Blue")).mkdir(parents=True, exist_ok=True)
+            Path(os.path.join(imgs_out, "Green")).mkdir(parents=True, exist_ok=True)
+            Path(os.path.join(imgs_out, "Red")).mkdir(parents=True, exist_ok=True)
+            Path(os.path.join(imgs_out, "RedEdge1")).mkdir(parents=True, exist_ok=True)
+            Path(os.path.join(imgs_out, "RedEdge2")).mkdir(parents=True, exist_ok=True)
+            Path(os.path.join(imgs_out, "RedEdge3")).mkdir(parents=True, exist_ok=True)
+            Path(os.path.join(imgs_out, "Nir2")).mkdir(parents=True, exist_ok=True)
         
         for n, key in enumerate(matches):
             print(sep_trace)
@@ -168,9 +180,17 @@ class Pipelines:
             results[key].update({'Chla': 'empty'})
             results[key].update({'Turb': 'empty'})
             results[key].update({'HySPM': 'empty'})
-            results[key].update({'Red': 'empty'})
-            results[key].update({'Nir2': 'empty'})
-            
+            # Rrs bands
+            if self.report_rrs == 'True':
+                results[key].update({'Aerosol': 'empty'})  # 443
+                results[key].update({'Blue': 'empty'})     # 490
+                results[key].update({'Green': 'empty'})    # 560
+                results[key].update({'Red': 'empty'})      # 665
+                results[key].update({'RedEdge1': 'empty'}) # 705
+                results[key].update({'RedEdge2': 'empty'}) # 740
+                results[key].update({'RedEdge3': 'empty'}) # 783
+                results[key].update({'Nir2': 'empty'})     # 865
+
             try:
                 print(f'Loading GRS data...')
                 grs_t = i.get_input_nc(file=str_matches[key]['IMG'], sensor='S2MSI', AC_processor='GRS', grs_version='v20')
@@ -190,8 +210,14 @@ class Pipelines:
                 grs = m.filter_pixels(rrs_dict=grs, neg_rrs='Red', low_rrs=True, low_rrs_thresh=0.002, low_rrs_bands=['Aerosol', 'Blue', 'Green', 'Red', 'RedEdge1', 'RedEdge2'])
 
                 # Clear and get Rrs
-                print(f'Obtaining Rrs from RED-665nm and NIR2-865nm...')
+                print(f'Obtaining Rrs from Aerosol:443, Blue:490, Green:560, Red:665, RedEdge1:705, RedEdge2:740, RedEdge3:783, and Nir2:865nm...')
+                aerosol = m._quick_rrs(rrs_dict=grs, bname='Aerosol')
+                blue = m._quick_rrs(rrs_dict=grs, bname='Blue')
+                green = m._quick_rrs(rrs_dict=grs, bname='Green')
                 red = m._quick_rrs(rrs_dict=grs, bname='Red')
+                rededge1 = m._quick_rrs(rrs_dict=grs, bname='RedEdge1')
+                rededge2 = m._quick_rrs(rrs_dict=grs, bname='RedEdge2')
+                rededge3 = m._quick_rrs(rrs_dict=grs, bname='RedEdge3')
                 nir2 = m._quick_rrs(rrs_dict=grs, bname='Nir2')
 
                 # number of pixels
@@ -266,7 +292,42 @@ class Pipelines:
                     turb[np.where(owt_classes[0,:,:]==1)] = 0
                     hyspm[np.where(owt_classes[0,:,:]==1)] = 0
                     
-                    # writing
+                    # writing Rrs bands
+                    print(f'Parameter report_rrs set to {self.report_rrs}')
+                    if self.report_rrs == 'True':
+                        print(f'Writing Rrs rasters...')
+                        str_output_file = os.path.join(imgs_out, "Aerosol/Aerosol_" + key + ".tif")
+                        r.array2tiff(ndarray_data=(aerosol*10000).astype('uint16'), str_output_file=str_output_file, transform=grs.attrs['trans'], projection=grs.attrs['proj'], no_data=no_data)
+                        results[key].update({'Aerosol': str_output_file})
+
+                        str_output_file = os.path.join(imgs_out, "Blue/Blue_" + key + ".tif")
+                        r.array2tiff(ndarray_data=(blue*10000).astype('uint16'), str_output_file=str_output_file, transform=grs.attrs['trans'], projection=grs.attrs['proj'], no_data=no_data)
+                        results[key].update({'Blue': str_output_file})
+
+                        str_output_file = os.path.join(imgs_out, "Green/Green_" + key + ".tif")
+                        r.array2tiff(ndarray_data=(green*10000).astype('uint16'), str_output_file=str_output_file, transform=grs.attrs['trans'], projection=grs.attrs['proj'], no_data=no_data)
+                        results[key].update({'Green': str_output_file})
+
+                        str_output_file = os.path.join(imgs_out, "Red/Red_" + key + ".tif")
+                        r.array2tiff(ndarray_data=(red*10000).astype('uint16'), str_output_file=str_output_file, transform=grs.attrs['trans'], projection=grs.attrs['proj'], no_data=no_data)
+                        results[key].update({'Red': str_output_file})
+                        
+                        str_output_file = os.path.join(imgs_out, "RedEdge1/RedEdge1_" + key + ".tif")
+                        r.array2tiff(ndarray_data=(rededge1*10000).astype('uint16'), str_output_file=str_output_file, transform=grs.attrs['trans'], projection=grs.attrs['proj'], no_data=no_data)
+                        results[key].update({'RedEdge1': str_output_file})
+
+                        str_output_file = os.path.join(imgs_out, "RedEdge2/RedEdge2_" + key + ".tif")
+                        r.array2tiff(ndarray_data=(rededge2*10000).astype('uint16'), str_output_file=str_output_file, transform=grs.attrs['trans'], projection=grs.attrs['proj'], no_data=no_data)
+                        results[key].update({'RedEdge2': str_output_file})
+
+                        str_output_file = os.path.join(imgs_out, "RedEdge3/RedEdge3_" + key + ".tif")
+                        r.array2tiff(ndarray_data=(rededge3*10000).astype('uint16'), str_output_file=str_output_file, transform=grs.attrs['trans'], projection=grs.attrs['proj'], no_data=no_data)
+                        results[key].update({'RedEdge3': str_output_file})
+
+                        str_output_file = os.path.join(imgs_out, "Nir2/Nir2_" + key + ".tif")
+                        r.array2tiff(ndarray_data=(nir2*10000).astype('uint16'), str_output_file=str_output_file, transform=grs.attrs['trans'], projection=grs.attrs['proj'], no_data=no_data)
+                        results[key].update({'Nir2': str_output_file})
+
                     print(f'Writing the rasters of the water quality parameters...')
                     no_data = 0
                     str_output_file = os.path.join(imgs_out, "Chla/Chla_" + key + ".tif")
@@ -280,24 +341,20 @@ class Pipelines:
                     str_output_file = os.path.join(imgs_out, "HySPM/HySPM_" + key + ".tif")
                     r.array2tiff(ndarray_data=(hyspm*100).astype('uint16'), str_output_file=str_output_file, transform=grs.attrs['trans'], projection=grs.attrs['proj'], no_data=no_data)
                     results[key].update({'HySPM': str_output_file})
-
-                    str_output_file = os.path.join(imgs_out, "Red/Red_" + key + ".tif")
-                    r.array2tiff(ndarray_data=(red*10000).astype('uint16'), str_output_file=str_output_file, transform=grs.attrs['trans'], projection=grs.attrs['proj'], no_data=no_data)
-                    results[key].update({'Red': str_output_file})
-
-                    str_output_file = os.path.join(imgs_out, "Nir2/Nir2_" + key + ".tif")
-                    r.array2tiff(ndarray_data=(nir2*10000).astype('uint16'), str_output_file=str_output_file, transform=grs.attrs['trans'], projection=grs.attrs['proj'], no_data=no_data)
-                    results[key].update({'Nir2': str_output_file})
-
-
-                
+               
                 stacked = None
                 grs.close()
                 grs_t.close()
             
+                t_hour, t_min, t_sec,_ = u.tac()
+                print(f'Done processing: {n+1}/{tot} - {key} \nExecution time: {t_hour}h : {t_min}m : {t_sec}s')
+                
+
             except Exception as e:
                 print(e)
                 print(f'Error processing {key}: {e}')
+                t_hour, t_min, t_sec,_ = u.tac()
+                print(f'Execution time: {t_hour}h : {t_min}m : {t_sec}s')
                 continue
         
         # Saving metadata json file with resulting file paths
@@ -392,7 +449,7 @@ class Pipelines:
     @staticmethod
     def build_excel(itermediary_dict, file_to_save):
         df = pd.DataFrame(itermediary_dict).T
-        df.drop(columns=['npix', 'OWT', 'OWTSPM', 'Chla', 'Turb', 'HySPM', 'Red', 'Nir2'], inplace=True)
+        df.drop(columns=['npix', 'OWT', 'OWTSPM', 'Chla', 'Turb', 'HySPM', 'Aerosol', 'Blue', 'Green', 'Red', 'RedEdge1', 'RedEdge2', 'RedEdge3', 'Nir2'], inplace=True)
         ## ALTERNATIVE: Move coumns to end of DF
         # df = df[[c for c in df if c not in cols_to_move] + cols_to_move]
         df.sort_index(inplace=True)
@@ -445,24 +502,49 @@ class Pipelines:
             # '--------------'        
             
             # One-liners to fetch pixel data inside ROI in a given path of imgs
-            print('Fetching Rrs-665nm data..')
-            _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Red'],roi_vector, prefix='Red', scale_factor=10000)) for key in itermediary_batch_dict.keys()]
-            print('Done.')
+            if self.report_rrs == 'True':
+                print('Fetching Aerosol-443nm data..')
+                _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Aerosol'], roi_vector, prefix='Aerosol', scale_factor=10000)) for key in itermediary_batch_dict.keys()]
+                print('Done.')
 
-            print('Fetching Rrs-865nm data..')
-            _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Nir2'],roi_vector, prefix='Nir2', scale_factor=10000)) for key in itermediary_batch_dict.keys()]
-            print('Done.')
+                print('Fetching Blue-490nm data..')
+                _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Blue'], roi_vector, prefix='Blue', scale_factor=10000)) for key in itermediary_batch_dict.keys()]
+                print('Done.')
+
+                print('Fetching Green-560nm data..')
+                _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Green'], roi_vector, prefix='Green', scale_factor=10000)) for key in itermediary_batch_dict.keys()]
+                print('Done.')
+
+                print('Fetching Red-665nm data..')
+                _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Red'], roi_vector, prefix='Red', scale_factor=10000)) for key in itermediary_batch_dict.keys()]
+                print('Done.')
+
+                print('Fetching RedEdge1-705nm data..')
+                _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['RedEdge1'], roi_vector, prefix='RedEdge1', scale_factor=10000)) for key in itermediary_batch_dict.keys()]
+                print('Done.')
+
+                print('Fetching RedEdge2-740nm data..')
+                _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['RedEdge2'], roi_vector, prefix='RedEdge2', scale_factor=10000)) for key in itermediary_batch_dict.keys()]
+                print('Done.')
+
+                print('Fetching RedEdge3-783nm data..')
+                _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['RedEdge3'], roi_vector, prefix='RedEdge3', scale_factor=10000)) for key in itermediary_batch_dict.keys()]
+                print('Done.')
+
+                print('Fetching Nir2-865nm data..')
+                _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Nir2'], roi_vector, prefix='Nir2', scale_factor=10000)) for key in itermediary_batch_dict.keys()]
+                print('Done.')
 
             print('Fetching SPM L2B data..')
-            _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['HySPM'],roi_vector, prefix='HySPM')) for key in itermediary_batch_dict.keys()]
+            _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['HySPM'], roi_vector, prefix='HySPM')) for key in itermediary_batch_dict.keys()]
             print('Done.')
 
             print('Fetching Turbidity L2B data..')
-            _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Turb'],roi_vector, prefix='Turb')) for key in itermediary_batch_dict.keys()]
+            _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Turb'], roi_vector, prefix='Turb')) for key in itermediary_batch_dict.keys()]
             print('Done.')
 
             print('Fetching Chl-a L2B data..')
-            _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Chla'],roi_vector, prefix='Chla')) for key in itermediary_batch_dict.keys()]
+            _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Chla'], roi_vector, prefix='Chla')) for key in itermediary_batch_dict.keys()]
             print('Done.')
 
             print('Fetching L2B pixel metadata..')

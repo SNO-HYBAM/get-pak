@@ -181,7 +181,8 @@ class GRS:
 
         return metadata
 
-    def get_grs_dict(self, grs_nc_file, grs_version='v20'):
+    @staticmethod
+    def get_grs_dict(grs_nc_file, grs_version='v20'):
         """
         Open GRS netCDF files using xarray and dask, and return
         a DataArray containing only the Rrs bands.
@@ -197,7 +198,7 @@ class GRS:
         The band names can be found at getpak.commons.DefaultDicts.grs_v20nc_s2bands
         """
         # client = self.client()
-        meta = self.metadata(grs_nc_file)
+        meta = GRS.metadata(grs_nc_file)
         # list of bands
         bands = dd.grs_v20nc_s2bands
         # self.log.info(f'Opening GRS version {grs_version} file {grs_nc_file}')
@@ -243,8 +244,9 @@ class GRS:
         ds.close()
         # grs = client.persist(grs)
         return grs, meta, proj, trans
- 
-    def _get_shp_features(self, shp_file, unique_key='id', grs_crs='EPSG:32720'):
+    
+    @staticmethod
+    def _get_shp_features(shp_file, unique_key='id', grs_crs='EPSG:32720'):
         '''
         INTERNAL FUNCTION
         Given a shp_file.shp, read each feature by unique 'id' and save it in a dict.
@@ -275,11 +277,12 @@ class GRS:
 
     # Internal function to paralelize the process of each band and point
     # TODO: improve documentation
-    def _process_band_point(self, band, shp_feature, crs, pt_id):
+    def _process_band_point(grs_raster_band, band, shp_feature, crs, pt_id):
         """
         INTERNAL FUNCTION
         """
-        Rrs_raster_band = self.grs_dict[band]
+        Rrs_raster_band = grs_raster_band
+        # Rrs_raster_band = self.grs_dict[band]
         Rrs_raster_band.rio.set_spatial_dims(x_dim="x", y_dim="y", inplace=True)
         clipped_rrs = Rrs_raster_band.rio.clip(shp_feature.geometry.values, crs)
         global counter
