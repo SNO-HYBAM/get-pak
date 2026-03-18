@@ -257,7 +257,8 @@ class Pipelines:
                         owt_weights[2,mask] = 0
 
                     # n pixels    
-                    pixels[3,1] = len(owt_classes[0,:,:]==1)
+                    pixels[3,1] = np.count_nonzero(owt_classes[0,:,:] == 1)
+
                     # writing the file
                     str_output_file = os.path.join(imgs_out, "npix/npixels_" + key + ".txt")
                     np.savetxt(str_output_file, pixels, fmt='%s', delimiter=';')
