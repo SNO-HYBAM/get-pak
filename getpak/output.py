@@ -4,7 +4,6 @@ import numpy as np
 
 from osgeo import gdal
 from pathlib import Path
-from dask.distributed import Client as dkClient, LocalCluster
 from rasterio.warp import calculate_default_transform, reproject, Resampling
 
 # GET-Pak imports

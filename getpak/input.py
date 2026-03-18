@@ -9,7 +9,6 @@ from pathlib import Path
 from osgeo import gdal
 from affine import Affine
 
-from getpak import cluster
 from datetime import datetime
 from getpak.commons import DefaultDicts as dd
 

@@ -1,6 +1,6 @@
 __package__ = 'getpak'
-__version__ = '0.0.9'
-__all__ = ['automation', 'cluster', 'commons', 'input', 'inversion_functions', 'methods', 'output', 'validation']
+__version__ = '0.1.0'
+__all__ = ['automation', 'commons', 'input', 'inversion_functions', 'methods', 'output', 'validation']
 
 import json
 import importlib.resources as importlib_resources
