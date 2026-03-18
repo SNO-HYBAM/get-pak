@@ -473,9 +473,9 @@ class Pipelines:
     def _parse_tifs(path_to_tif, shp_file, prefix='var', scale_factor=100):
         stats = m.shp_stats(tif_file=path_to_tif, shp_poly=shp_file)
 
-        def _fix_scale(value,factor=100):
+        def _fix_scale(value,factor=100,digits=6):
             if value is not None:
-                value = round(value/factor,2)
+                value = round(value/factor,digits)
             return value
             
         results = {
