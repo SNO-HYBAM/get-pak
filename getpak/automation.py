@@ -558,8 +558,9 @@ class Pipelines:
 
 
 if __name__=='__main__':
+    
     st_time = u.tic()
-
+    u.print_logo()
     p = Pipelines()
     
     if p.compute_l2b == 'True':

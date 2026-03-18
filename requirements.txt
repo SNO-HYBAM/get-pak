@@ -2,6 +2,7 @@ dask
 fiona
 geopandas
 h5netcdf
+h5py
 openpyxl
 importlib-resources
 jupyterlab
