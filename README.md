@@ -1,7 +1,7 @@
 ## GET-pak
 **G**éosciences **E**nvironnement **T**oulouse - **P**rocessing and **a**nalysis Wor**k**bench
 
-GETpak aims to provide tools for Sentinel-2, Sentinel-3, GeoTIFF, NetCDF and vector data manipulation and validation.
+GETpak aims to provide tools for Sentinel-2 and Sentinel-3 mission data in GeoTIFF and NetCDF formats using vector polygons to extract and manipulate data in order to facilitate and automate analysis and validation tasks.
 
 ```plaintext
             _..._
@@ -28,26 +28,27 @@ usage of a conda environment
 is strongly recommended. Unless you know what you are doing (-:
 
 ## Installation
-Create a Conda environment (python versions above 3.9 were not tested but they should also be compatible):
+Create a Conda environment using python 3.10 (compatible for both windows and linux):
 ```
-conda create --name getpak python=3.9
+conda create --name gpk310 python=3.10
 ```
 Activate your conda env:
 ```
-conda activate getpak
+conda activate gpk310
 ```
-With your conda env activated, install GDAL before installing `getpak` to avoid dependecy errors:
+With your conda env activated, install `GDAL` before installing `getpak` to avoid dependecy errors, note that you should not specify the channel using -c in this step:
 ```
-conda install -c conda-forge gdal
+conda install gdal
 ```
-Clone `getpak` repo to the desired location. First, install the dependencies using conda:
+Once `GDAL` is installed, clone `getpak` repository to any desired location, enter the folder and install required the dependencies:
 ```
-conda install --file requirements.txt
+pip install -r requirements.txt
 ```
-Finally, install the library:
+Aditional dependency libraries note present in the requirements.txt also need to be installed for OS-compatibility reasons:
 ```
-pip install .
+conda install h5py libgdal-netcdf
 ```
-
-To ensure installation, you can check the examples made for the library. Don't forget to correct the
-path to the images!
+Check if the settings.ini file is adapted to your needs before launching the program, then:
+```
+python -m getpak.automation
+```
