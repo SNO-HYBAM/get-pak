@@ -102,6 +102,13 @@ class Utils:
         return str_GDAL_DRIVER_PATH
 
     @staticmethod
+    def to_uint16_scaled(arr, scale=10000, nodata=65535):
+        arr = np.asarray(arr, dtype=float) * scale
+        arr = np.where(np.isfinite(arr), arr, nodata)
+        arr = np.clip(arr, 0, nodata)
+        return arr.astype(np.uint16)
+
+    @staticmethod
     def sort_l2b_by_date(input_directory_path):
         """
         Creates a python list containing the Posixpath from all the files inside the directory and sort them by date.
