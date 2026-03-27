@@ -13,10 +13,17 @@ from getpak.commons import DefaultDicts as dd
 from dask import compute
 from dask import delayed
 
-from getpak import owts_spy_S2_B1_7
-from getpak import owts_spy_S2_B2_7
-from getpak import owts_spm_S2_B1_8A
-from getpak import owts_spm_S2_B2_8A 
+from getpak.resources import (
+    load_owts_spy_s2_b1_7,
+    load_owts_spy_s2_b2_7,
+    load_owts_spm_s2_b1_8a,
+    load_owts_spm_s2_b2_8a,
+)
+
+owts_spy_S2_B1_7 = load_owts_spy_s2_b1_7()
+owts_spy_S2_B2_7 = load_owts_spy_s2_b2_7()
+owts_spm_S2_B1_8A = load_owts_spm_s2_b1_8a()
+owts_spm_S2_B2_8A = load_owts_spm_s2_b2_8a()
 
 
 class Methods:
