@@ -1,9 +1,9 @@
 import os
-import getpak
 from setuptools import setup, find_packages
 
-__version__ = getpak.__version__
 __package__ = 'getpak'
+__version__ = '0.1.0'
+
 short_description = 'Sentinel-2 and 3 raster and vector manipulation and validation tools.'
 
 # allow setup.py to be run from any path
@@ -13,7 +13,7 @@ setup(
     name=__package__,
     version=__version__,
     url='https://github.com/hybam-dev/get-pak',
-    packages=find_packages(include=["getpak.*"]),
+    packages=find_packages(include=["getpak", "getpak.*"]),
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
