@@ -13,6 +13,15 @@ from datetime import datetime
 from getpak.commons import DefaultDicts as dd
 
 
+# module-level wrapper function, enable users to import get_input_nc directly
+def get_input_nc(file, sensor="S2MSI", AC_processor="GRS", grs_version=None):
+    return Input().get_input_nc(
+        file=file,
+        sensor=sensor,
+        AC_processor=AC_processor,
+        grs_version=grs_version,
+    )
+
 class Input:
     """
     Core function to read any input images for processing with GET-Pak

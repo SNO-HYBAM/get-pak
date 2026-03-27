@@ -12,13 +12,16 @@ from PIL import Image
 from pathlib import Path
 from configparser import ConfigParser
 from osgeo import gdal, ogr, osr
-from getpak import s2projgrid
+from getpak.resources import load_s2projgrid
 
 
 try:
     from osgeo import gdal, ogr, osr
 except:
     print("Unable to import osgeo! GETpak can still operate but critical functions may fail.")
+
+# Import CRS projection information from /data/s2_proj_ref.json
+s2projgrid = load_s2projgrid()
 
 
 class Utils:
