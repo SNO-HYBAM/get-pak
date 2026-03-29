@@ -49,6 +49,26 @@ class Methods:
 
     def __init__(self):
         pass
+
+    @staticmethod
+    def safe_divide(num, den):
+        num = np.asarray(num, dtype=float)
+        den = np.asarray(den, dtype=float)
+        out = np.full(np.broadcast(num, den).shape, np.nan, dtype=float)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            return np.divide(num, den, out=out, where=np.isfinite(den) & (den != 0))
+
+    @staticmethod
+    def safe_sqrt(x):
+        x = np.asarray(x, dtype=float)
+        x = np.where(x >= 0, x, np.nan)
+        return np.sqrt(x)
+
+    @staticmethod
+    def safe_log10(x):
+        x = np.asarray(x, dtype=float)
+        x = np.where(x > 0, x, np.nan)
+        return np.log10(x)
     
     @staticmethod
     def shp_stats(tif_file, shp_poly, keep_spatial=False, statistics='count min mean max median std'):

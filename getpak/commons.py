@@ -53,10 +53,13 @@ class Utils:
         pass
     
     @staticmethod
-    def read_config():
+    def read_config(config_path=None):
         config = ConfigParser(converters={'list': lambda x: [i.strip() for i in x.split(',')]})
         # get the path to config.ini in the root folder
-        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'settings.ini')
+        if config_path is None:
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'settings.ini')
+        else:
+            config_path = os.path.abspath(config_path)
         print(f'Atempting to read config file: {config_path}')
         # check if the path points to a valid file
         if not os.path.isfile(config_path):
