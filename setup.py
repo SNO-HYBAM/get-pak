@@ -14,6 +14,7 @@ setup(
     version=__version__,
     url='https://github.com/hybam-dev/get-pak',
     packages=find_packages(include=["getpak", "getpak.*"]),
+    py_modules=['main'],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
