@@ -60,10 +60,6 @@ class Pipelines:
     def tile_id(self):
         return self.settings.get('processing', 's2_tile')['s2_tile']
     
-    @property
-    def _as_bool(value):
-        return str(value).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
-    
     # @property
     # def grs_files(self):
     #     grs_file_list = u.walktalk(self.input_folder, unwanted_string='*_anc*')
@@ -91,6 +87,14 @@ class Pipelines:
             required_bands = [name for name, param in signature.parameters.items() if param.default == inspect.Parameter.empty]
             fx_req_bands[algo] = required_bands
         return fx_req_bands         
+
+    @staticmethod
+    def _as_bool(value):
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return False
+        return str(value).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
 
     def run(self, compute_l2b=None, make_report=None):
         """

@@ -78,6 +78,9 @@ def main(argv=None):
     """
     Public entry point.
     """
+    U.tic()
+    t1 = time.perf_counter()
+
     parser = build_parser()
     args = parser.parse_args(argv)
 
@@ -90,23 +93,18 @@ def main(argv=None):
     U.print_logo()
     
     print(f'GET-Pak version: {getpak.__version__}')
-    
     print(f'GET-Pak command: {command}')
     
     run_pipeline(command=command, config_path=args.config)
-
-    return 0
-
-if __name__ == '__main__':
-
-    U.tic()
-    t1 = time.perf_counter()
-    
-    exit_code = main()
 
     t_hour, t_min, t_sec, _ = U.tac()
     t2 = time.perf_counter()
 
     print(f'Finished in {round(t2 - t1, 2)} second(s).')
     print(f'Elapsed execution time: {t_hour}h : {t_min}m : {t_sec}s')
-    raise SystemExit(exit_code)
+
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
