@@ -22,12 +22,11 @@ m = Methods()
 
 class Pipelines:
     
-    def __init__(self):
+    def __init__(self, config_path=None):
         # GET-Pak settings
-        self.settings = u.read_config()
+        self.settings = u.read_config(config_path=config_path)
         self.INSTANCE_TIME_TAG = datetime.now().strftime('%Y%m%dT%H%M%S')
-        pass
-    
+
 
     @property
     def input_folder(self):
@@ -61,8 +60,6 @@ class Pipelines:
     def tile_id(self):
         return self.settings.get('processing', 's2_tile')['s2_tile']
     
-    
-
     # @property
     # def grs_files(self):
     #     grs_file_list = u.walktalk(self.input_folder, unwanted_string='*_anc*')
@@ -91,6 +88,33 @@ class Pipelines:
             fx_req_bands[algo] = required_bands
         return fx_req_bands         
 
+    @staticmethod
+    def _as_bool(value):
+        if isinstance(value, bool):
+            return value
+        if value is None:
+            return False
+        return str(value).strip().lower() in {'1', 'true', 'yes', 'y', 'on'}
+
+    def run(self, compute_l2b=None, make_report=None):
+        """
+        Run the GET-Pak processing flow.
+
+        If compute_l2b or make_report are None, the values are read from settings.ini.
+        """
+        compute_l2b = self._as_bool(self.compute_l2b) if compute_l2b is None else compute_l2b
+        make_report = self._as_bool(self.make_report) if make_report is None else make_report
+
+        if compute_l2b:
+            print('Compute L2B set to True.')
+            self.get_matchups()
+            self.matchups_to_l2b()
+        
+        if make_report:
+            print('Generating report.')
+            self.build_report()
+
+        return self
 
     def get_matchups(self, do_return=False):
         """ GRS L2B + WD + OWT """
@@ -557,23 +581,18 @@ class Pipelines:
             self.build_excel(itermediary_batch_dict, file_to_save=xlsx_target)
             pass
 
-
-if __name__=='__main__':
-    
-    st_time = u.tic()
+def main():
+    u.tic()
     u.print_logo()
+    
     p = Pipelines()
     
-    if p.compute_l2b == 'True':
-        print('Compute L2B set to True.')
-        p.get_matchups()
-        p.matchups_to_l2b()
+    p.run()
 
-    if p.make_report == 'True':
-        print('Generating report.')
-        p.build_report()
-    
     t_hour, t_min, t_sec,_ = u.tac()
     print(f'Done. \nElapsed execution time: {t_hour}h : {t_min}m : {t_sec}s')
-    
-    pass
+    return 0
+
+
+if __name__=='__main__':
+    raise SystemExit(main())

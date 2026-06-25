@@ -48,7 +48,31 @@ Aditional dependency libraries note present in the requirements.txt also need to
 ```
 conda install h5py libgdal-netcdf
 ```
-Check if the settings.ini file is adapted to your needs before launching the program, then:
+Install the package:
+```
+pip install -e .
+```
+Done.
+
+## BEFORE RUNNING
+
+⚠️ Be sure that settings.ini file is adapted to your needs before launching the program!
+
+Run the full settings-driven workflow:
+```
+python main.py run
+```
+Run only the L2B processing step:
+```
+python main.py l2b
+```
+
+Run only the report/time-series extraction step:
+```
+python main.py report
+```
+
+The automation module can also be launched directly:
 ```
 python -m getpak.automation
 ```
