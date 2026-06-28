@@ -85,6 +85,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     if args.version:
+        U.print_logo()
         print(f'GET-Pak version: {getpak.__version__}')
         return 0
 
