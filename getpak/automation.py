@@ -166,6 +166,7 @@ class Pipelines:
         """
         TO-DO
         """
+        report_rrs = self._as_bool(self.report_rrs)
         matches = self.matches
         str_matches = self.str_matches
 
@@ -181,7 +182,7 @@ class Pipelines:
         Path(os.path.join(imgs_out, "Turb")).mkdir(parents=True, exist_ok=True)
         Path(os.path.join(imgs_out, "HySPM")).mkdir(parents=True, exist_ok=True)
         # Rrs bands
-        if self.report_rrs == 'True':
+        if report_rrs:
             Path(os.path.join(imgs_out, "Aerosol")).mkdir(parents=True, exist_ok=True)
             Path(os.path.join(imgs_out, "Blue")).mkdir(parents=True, exist_ok=True)
             Path(os.path.join(imgs_out, "Green")).mkdir(parents=True, exist_ok=True)
@@ -205,7 +206,7 @@ class Pipelines:
             results[key].update({'Turb': 'empty'})
             results[key].update({'HySPM': 'empty'})
             # Rrs bands
-            if self.report_rrs == 'True':
+            if report_rrs:
                 results[key].update({'Aerosol': 'empty'})  # 443
                 results[key].update({'Blue': 'empty'})     # 490
                 results[key].update({'Green': 'empty'})    # 560
@@ -216,8 +217,12 @@ class Pipelines:
                 results[key].update({'Nir2': 'empty'})     # 865
 
             try:
-                print(f'Loading GRS data...')
-                grs_t = i.get_input_nc(file=str_matches[key]['IMG'], sensor='S2MSI', AC_processor='GRS', grs_version='v20')
+                grs_ver = self.grs_file_version
+                print(f'Loading GRS data using grs_version={grs_ver}...')
+                grs_t = i.get_input_nc(file=str_matches[key]['IMG'],
+                                       sensor='S2MSI',
+                                       AC_processor='GRS',
+                                       grs_version=grs_ver)
                 
                 print(f'Intersecting image with water mask...')
                 grs = m.intersect_watermask(rrs_dict=grs_t, water_mask_dir=str_matches[key]['WM'])
@@ -318,8 +323,8 @@ class Pipelines:
                     hyspm[np.where(owt_classes[0,:,:]==1)] = 0
                     
                     # writing Rrs bands
-                    print(f'Parameter report_rrs set to {self.report_rrs}')
-                    if self.report_rrs == 'True':
+                    print(f'Parameter report_rrs set to {report_rrs}')
+                    if report_rrs:
                         print(f'Writing Rrs rasters...')
                         str_output_file = os.path.join(imgs_out, "Aerosol/Aerosol_" + key + ".tif")
                         r.array2tiff(ndarray_data=(aerosol*10000).astype('uint16'), str_output_file=str_output_file, transform=grs.attrs['trans'], projection=grs.attrs['proj'], no_data=no_data)
@@ -527,7 +532,7 @@ class Pipelines:
             # '--------------'        
             
             # One-liners to fetch pixel data inside ROI in a given path of imgs
-            if self.report_rrs == 'True':
+            if report_rrs:
                 print('Fetching Aerosol-443nm data..')
                 _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Aerosol'], roi_vector, prefix='Aerosol', scale_factor=10000)) for key in itermediary_batch_dict.keys()]
                 print('Done.')
