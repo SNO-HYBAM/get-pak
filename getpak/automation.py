@@ -46,15 +46,21 @@ class Pipelines:
     
     @property
     def compute_l2b(self):
-        return self.settings.get('processing', 'compute_l2b')['compute_l2b']
+        return self._as_bool(
+            self.settings.get('processing', {}).get('compute_l2b', False)
+        )
         
     @property
     def make_report(self):
-        return self.settings.get('processing','make_report')['make_report']
-        # TO-DO return _as_bool(self.settings['processing']['make_report'])
+        return self._as_bool(
+            self.settings.get('processing', {}).get('make_report', False)
+        )
+    
     @property
     def report_rrs(self):
-        return self.settings.get('processing','report_rrs')['report_rrs']
+        return self._as_bool(
+            self.settings.get('processing', {}).get('report_rrs', False)
+            )
 
     @property
     def tile_id(self):
@@ -102,8 +108,8 @@ class Pipelines:
 
         If compute_l2b or make_report are None, the values are read from settings.ini.
         """
-        compute_l2b = self._as_bool(self.compute_l2b) if compute_l2b is None else compute_l2b
-        make_report = self._as_bool(self.make_report) if make_report is None else make_report
+        compute_l2b = self.compute_l2b if compute_l2b is None else compute_l2b
+        make_report = self.make_report if make_report is None else make_report
 
         if compute_l2b:
             print('Compute L2B set to True.')
@@ -166,7 +172,7 @@ class Pipelines:
         """
         TO-DO
         """
-        report_rrs = self._as_bool(self.report_rrs)
+        report_rrs = self.report_rrs
         matches = self.matches
         str_matches = self.str_matches
 
@@ -520,6 +526,8 @@ class Pipelines:
 
     def build_report(self):
         
+        report_rrs = self.report_rrs
+
         print(f'Building intermediary dictionary with the output folder : {self.output_folder}')
         itermediary_batch_dict = self.line_builder()
         
