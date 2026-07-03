@@ -1,7 +1,12 @@
-## GET-pak
-**G**éosciences **E**nvironnement **T**oulouse - **P**rocessing and **a**nalysis Wor**k**bench
+## GET-Pak
 
-GETpak aims to provide tools for Sentinel-2 and Sentinel-3 mission data in GeoTIFF and NetCDF formats using vector polygons to extract and manipulate data in order to facilitate and automate analysis and validation tasks.
+**G**éosciences **E**nvironnement **T**oulouse – **P**rocessing and **A**nalysis Wor**k**bench
+
+GET-Pak is an open-source Python toolbox for reproducible inland-water quality research.
+
+It converts atmospherically corrected Sentinel-2 MSI reflectance products (especially GRS NetCDF outputs), into Level-2B water-quality maps such as suspended particulate matter, turbidity, chlorophyll-a, and CDOM-related products. It also extracts statistics over user-defined polygons, builds time series, and prepares satellite–in situ matchups for validation.
+
+GET-Pak is designed for both interactive Jupyter workflows and automated batch processing (CLI), making it suitable for single-scene exploration, regional monitoring, and large image collections on local machines or HPC systems.
 
 ```plaintext
             _..._
@@ -76,3 +81,14 @@ The automation module can also be launched directly:
 ```
 python -m getpak.automation
 ```
+
+## Related research
+
+GET-Pak's current release integrates methodology from the following articles:
+
+Harmel, T., Chami, M., Tormos, T., Reynaud, N., Danis, P.-A., 2018. Sunglint correction of the Multi-Spectral Instrument (MSI)-SENTINEL-2 imagery over inland and sea waters from SWIR bands. Remote Sensing of Environment 204, 308–321. [https://doi.org/10.1016/j.rse.2017.10.022](https://doi.org/10.1016/j.rse.2017.10.022)
+
+Tavares, M.H., Guimarães, D., Roussillon, J., Baute, V., Cucherousset, J., Boulêtreau, S., Martinez, J.-M., 2025. A Framework to Retrieve Water Quality Parameters in Small, Optically Diverse Freshwater Ecosystems Using Sentinel-2 MSI Imagery. Remote Sensing 17, 2729. [https://doi.org/10.3390/rs17152729](https://doi.org/10.3390/rs17152729)
+
+Cordeiro, M.C.R., Martinez, J.-M., Peña-Luque, S., 2021. Automatic water detection from multidimensional hierarchical clustering for Sentinel-2 images and a comparison with Level 2A processors. Remote Sensing of Environment 253, 112209. [https://doi.org/10.1016/j.rse.2020.112209](https://doi.org/10.1016/j.rse.2020.112209)
+
