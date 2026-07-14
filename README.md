@@ -4,9 +4,11 @@
 
 GET-Pak is an open-source Python toolbox for reproducible inland-water quality research.
 
-It converts atmospherically corrected Sentinel-2 MSI reflectance products (especially GRS NetCDF outputs), into Level-2B water-quality maps such as suspended particulate matter, turbidity, chlorophyll-a, and CDOM-related products. It also extracts statistics over user-defined polygons, builds time series, and prepares satellite–in situ matchups for validation.
+It converts atmospherically corrected Sentinel-2 MSI reflectance products (especially GRS NetCDF outputs), into Level-2B water-quality maps such as suspended particulate matter, turbidity and chlorophyll-a. It also extracts statistics over user-defined regions of interest (ROI) in shapefile format, builds time series, and prepares satellite–in situ matchups for validation.
 
 GET-Pak is designed for both interactive Jupyter workflows and automated batch processing (CLI), making it suitable for single-scene exploration, regional monitoring, and large image collections on local machines or HPC systems.
+
+Citation will be possible once article submission process is complete, auxiliary data for reproducibility purposes is available at Zenodo under the link: https://zenodo.org/records/20933324 containing the ROI file liangzi_lake_epsg32650.shp, 10 GRS images and a few hundred pre-computed water masks so the user can test-run the program and generate an example report.
 
 ```plaintext
             _..._
