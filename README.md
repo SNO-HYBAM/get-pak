@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21372746.svg)](https://doi.org/10.5281/zenodo.21372746)
+
 ## GET-Pak
 
 **G**éosciences **E**nvironnement **T**oulouse – **P**rocessing and **A**nalysis Wor**k**bench
