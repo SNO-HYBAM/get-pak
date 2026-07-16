@@ -11,7 +11,7 @@ It converts atmospherically corrected Sentinel-2 MSI reflectance products (espec
 
 GET-Pak is designed for both interactive Jupyter workflows and automated batch processing (CLI), making it suitable for single-scene exploration, regional monitoring, and large image collections on local machines or HPC systems.
 
-Citation will be possible once article submission process is complete, auxiliary data for reproducibility purposes is available at Zenodo under the link: https://zenodo.org/records/20933324 containing the ROI file liangzi_lake_epsg32650.shp, 10 GRS images and a few hundred pre-computed water masks so the user can test-run the program and generate an example report.
+Citation will be possible once article submission process is complete, auxiliary data for reproducibility purposes is available at Zenodo under the link: https://doi.org/10.5281/zenodo.21372746 containing the ROI file liangzi_lake_epsg32650.shp, 3 GRS images and 3 pre-computed water masks so the user can test-run the program and generate an example report.
 
 ```plaintext
             _..._
