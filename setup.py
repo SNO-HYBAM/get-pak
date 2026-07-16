@@ -2,9 +2,9 @@ import os
 from setuptools import setup, find_packages
 
 __package__ = 'getpak'
-__version__ = '0.1.3'
+__version__ = '0.1.4'
 
-short_description = 'Sentinel-2 and 3 raster and vector manipulation and validation tools.'
+short_description = 'Raster and vector manipulation toolbox for reproducible water quality research.'
 
 # allow setup.py to be run from any path
 os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
