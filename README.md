@@ -1,5 +1,6 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21372746.svg)](https://doi.org/10.5281/zenodo.21372746)
-
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21372746-blue.svg)](https://doi.org/10.5281/zenodo.21372746)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+ 
 ## GET-Pak
 
 **G**éosciences **E**nvironnement **T**oulouse – **P**rocessing and **A**nalysis Wor**k**bench
@@ -31,10 +32,8 @@ Citation will be possible once article submission process is complete, auxiliary
               `-._/._/
 ```
 ### Setup
-⚠️ GDAL is a requirement for the installation, therefore, 
-usage of a conda environment 
-([Anaconda.org](https://www.anaconda.com/products/individual)) 
-is strongly recommended. Unless you know what you are doing (-:
+> [!IMPORTANT]
+> GDAL is a requirement for the installation, therefore, usage of a conda environment ([Anaconda.org](https://www.anaconda.com/products/individual)) is **STRONGLY** recommended. Unless you know what you are doing (-:
 
 ## Installation
 Create a Conda environment using python 3.10 (compatible for both windows and linux):
@@ -62,6 +61,9 @@ Install the package:
 pip install -e .
 ```
 Done.
+
+> [!TIP]
+> You can test-run GET-Pak with the files provided [here](https://doi.org/10.5281/zenodo.21372746).
 
 ## BEFORE RUNNING
 
