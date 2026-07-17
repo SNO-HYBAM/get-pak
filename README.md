@@ -32,7 +32,7 @@ GET-Pak is designed for both interactive Jupyter workflows and automated batch p
 A recommended citation will be added following publication of the GET-Pak software article. Auxiliary data for reproducibility purposes is available at Zenodo under the link: https://doi.org/10.5281/zenodo.20933323 containing the ROI file liangzi_lake_epsg32650.shp, 3 GRS images and 3 pre-computed water masks that can be used for a test-run to generate an example report.
 
 ## Related research
-The current release use methods described in the following publications:
+The current release uses methods described in the following publications:
 
 Harmel, T., Chami, M., Tormos, T., Reynaud, N., Danis, P.-A., 2018. Sunglint correction of the Multi-Spectral Instrument (MSI)-SENTINEL-2 imagery over inland and sea waters from SWIR bands. Remote Sensing of Environment 204, 308–321. [https://doi.org/10.1016/j.rse.2017.10.022](https://doi.org/10.1016/j.rse.2017.10.022)
 
@@ -110,10 +110,10 @@ After installation, run the complete settings-driven workflow:
 ```
 getpak run
 ```
-The above command will fetch settings.ini inside the installation folder.  
-Or you can also point to a customized settings.ini file:  
+The above command loads the settings.ini file included in the installation directory by default.  
+Or you can also point to a customized `settings.ini` file:  
 ```
-getpak run -c /path/to/your/settings.ini
+getpak run -c /path/to/your/customized_settings.ini
 ```
 Run only the L2B processing step:
 ```
