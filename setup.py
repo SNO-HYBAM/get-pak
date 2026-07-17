@@ -12,12 +12,12 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 setup(
     name=__package__,
     version=__version__,
-    url='https://github.com/hybam-dev/get-pak',
+    url="https://github.com/SNO-HYBAM/get-pak",
     packages=find_packages(include=["getpak", "getpak.*"]),
     py_modules=['main'],
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+        "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
     package_data={
@@ -26,7 +26,7 @@ setup(
         },
     include_package_data=True,
 
-    license='GPLv3',
+    license='MIT',
     author='David Guimaraes',
     author_email='dvdgmf@gmail.com',
     description=short_description,
