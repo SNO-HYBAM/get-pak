@@ -1,4 +1,4 @@
-[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21372746-blue.svg)](https://doi.org/10.5281/zenodo.21372746)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.20933323-blue.svg)](https://doi.org/10.5281/zenodo.20933323)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
  
 ## GET-Pak 
