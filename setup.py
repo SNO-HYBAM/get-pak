@@ -1,8 +1,12 @@
 import os
+import re
 from setuptools import setup, find_packages
 
 __package__ = 'getpak'
-__version__ = '0.2.0'
+
+_version_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'getpak', '_version.py')
+with open(_version_path, encoding='utf-8') as _version_file:
+    __version__ = re.search(r'__version__\s*=\s*[\"\']([^\"\']+)', _version_file.read()).group(1)
 
 short_description = 'Raster and vector manipulation toolbox for reproducible water quality research.'
 
@@ -15,15 +19,15 @@ setup(
     url="https://github.com/SNO-HYBAM/get-pak",
     packages=find_packages(include=["getpak", "getpak.*"]),
     py_modules=['main'],
+    python_requires='>=3.10,<3.14',
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
     package_data={
-        '': ['*.json', '*.ini'],
-        'getpak': ['getpak/data/*']
-        },
+        'getpak': ['data/*.json', 'data/*.ini'],
+    },
     include_package_data=True,
 
     license='MIT',

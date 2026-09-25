@@ -228,7 +228,7 @@ class Utils:
         output = settings["output_encoding"]
         units = {
             "rrs_multiplier": "sr-1", "chla_multiplier": "mg m-3",
-            "turbidity_multiplier": "NTU", "hyspm_multiplier": "mg L-1",
+            "turbidity_multiplier": "mg L-1", "hyspm_multiplier": "mg L-1",
         }
         return [
             {
@@ -239,7 +239,8 @@ class Utils:
             }
             for product, key in (
                 ("Rrs bands", "rrs_multiplier"), ("Chl-a", "chla_multiplier"),
-                ("Turbidity", "turbidity_multiplier"), ("HySPM", "hyspm_multiplier"),
+                ("OWT-SPM (legacy Turb)", "turbidity_multiplier"),
+                ("HySPM", "hyspm_multiplier"),
             )
         ]
 

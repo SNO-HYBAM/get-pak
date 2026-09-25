@@ -951,7 +951,7 @@ class Pipelines:
                     print(f'Calculating the OWT weights for each pixel and writing the raster file...')
                     owt_classes, owt_weights = m.classify_owt_chla_weights(class_px=class_px, angles=angles, n=3)
 
-                    # OWT classes for turbidity
+                    # OWT classes for the four-OWT OWT-SPM route
                     classes_turb, angles_turb = m.classify_owt_spm_px(rrs_dict=grs, sensor='S2MSI', B1=True)
 
                     # Different classes for low Rrs pixels
@@ -1006,8 +1006,8 @@ class Pipelines:
                     print(f'Calculating the chla for each dominant OWT and then the blended chla product...')
                     chla = m.blended_chla(rrs_dict=grs, owt_classes=owt_classes, owt_weights=owt_weights, limits=True)
 
-                    # calculating turbidity
-                    print(f'Calculating turbidity...')
+                    # calculating the legacy-named OWT-SPM product
+                    print(f'Calculating OWT-SPM (legacy Turb output)...')
                     turb = m.turb(rrs_dict=grs, class_owt_spt=classes_turb, alg='owt', limits=True)
 
                     # calculating SPM_S3
@@ -1116,7 +1116,9 @@ class Pipelines:
                     print('Writing the water-quality rasters...')
                     for product, values, unit in (
                         ('Chla', chla, 'mg m-3'),
-                        ('Turb', turb, 'NTU'),
+                        # Keep the Turb key/path for backward compatibility; the
+                        # four-OWT Jiang/Zhang/Binding retrieval is SPM mass.
+                        ('Turb', turb, 'mg L-1'),
                         ('HySPM', hyspm, 'mg L-1'),
                     ):
                         path, scale_metadata = self._write_scaled_raster(
@@ -1551,7 +1553,7 @@ class Pipelines:
 
             unit_notes = {
                 "Chla": "Chl-a statistics use physical units of mg m-3; *_count and *_roi_features are counts; *_status is text.",
-                "Turb": "Turbidity statistics use physical units of NTU; *_count and *_roi_features are counts; *_status is text.",
+                "Turb": "OWT-SPM statistics use physical units of mg L-1; Turb is the legacy product key/path; *_count and *_roi_features are counts; *_status is text.",
                 "HySPM": "HySPM statistics use physical units of mg L-1; *_count and *_roi_features are counts; *_status is text.",
             }
             for worksheet in workbook.worksheets:
@@ -1875,7 +1877,7 @@ class Pipelines:
             _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['HySPM'], roi_vector, prefix='HySPM', encoding_settings=self.settings)) for key in itermediary_batch_dict.keys()]
             print('Done.')
 
-            print('Fetching Turbidity L2B data..')
+            print('Fetching OWT-SPM L2B data (legacy Turb path)..')
             _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Turb'], roi_vector, prefix='Turb', encoding_settings=self.settings)) for key in itermediary_batch_dict.keys()]
             print('Done.')
 

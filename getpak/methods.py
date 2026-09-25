@@ -913,7 +913,9 @@ class Methods:
     def turb(self, rrs_dict, class_owt_spt, alg='owt', limits=True, mode_Jiang=None, rasterio_rast=None, shapefile=None,
              min_px=9):
         """
-        Function to calculate the turbidity based on the optical water type (OWT)
+        Function to calculate an OWT-dependent particulate-matter or turbidity
+        product. The ``alg='owt'`` route used by the automated pipeline is the
+        four-OWT OWT-SPM product and retains the legacy ``Turb`` output key.
 
         Parameters
         ----------

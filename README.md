@@ -1,6 +1,8 @@
 # GET-Pak
 
-GET-Pak turns atmospherically corrected Sentinel-2 MSI imagery into maps and summaries of inland-water quality. It produces suspended particulate matter, turbidity, chlorophyll-a, reflectance, and optical water type (OWT) products, and can summarize them over regions of interest (ROIs).
+This release-preparation line targets GET-Pak **v1.0.0**. The package, CLI, documentation, and synchronized SoftwareX manuscript use the same release version.
+
+GET-Pak turns atmospherically corrected Sentinel-2 MSI imagery into maps and summaries of inland-water quality. It produces suspended particulate matter (including OWT-SPM and HySPM), chlorophyll-a, reflectance, and optical water type (OWT) products, and can summarize them over regions of interest (ROIs). The four-OWT OWT-SPM product keeps the legacy `Turb` directory/key for backward-compatible filenames, but its physical unit is mg L-1; external field turbidity remains a distinct NTU quantity.
 
 It supports automated batch processing from GRS NetCDF products and from ACOLITE L2R NetCDF products. A SeaDAS reader is available for interactive workflows; SeaDAS batch processing is not part of the settings-driven command. GET-Pak does not run GRS or ACOLITE itself.
 
@@ -77,7 +79,7 @@ The scene ledger and output metadata record the original and selected transforms
 
 ## Outputs and filenames
 
-Products are written below `output/<tile>/` in their product directories (`OWT`, `OWTSPM`, `Chla`, `Turb`, `HySPM`, and optional Rrs-band directories). New raster names follow this pattern:
+Products are written below `output/<tile>/` in their product directories (`OWT`, `OWTSPM`, `Chla`, `Turb`, `HySPM`, and optional Rrs-band directories). `Turb` is the legacy directory name for the four-OWT OWT-SPM product. New raster names follow this pattern:
 
 ```text
 <Product>_<YYYYMMDDTHHMMSS>_T<tile>_<record_id>.tif
@@ -101,13 +103,13 @@ New rasters use encoding version `GETPAK-ENC-2`. Continuous products are unsigne
 | --- | ---: | ---: | ---: | --- |
 | Rrs bands | 10,000 | stored value × 0.0001 | 65,535 | sr-1 |
 | Chlorophyll-a | 100 | stored value × 0.01 | 65,535 | mg m-3 |
-| Turbidity | 10 | stored value × 0.1 | 65,535 | NTU |
+| OWT-SPM (`Turb` legacy key) | 10 | stored value × 0.1 | 65,535 | mg L-1 |
 | HySPM | 10 | stored value × 0.1 | 65,535 | mg L-1 |
 | OWT and OWTSPM | 1 | stored class code | 255 | class code |
 
 The GeoTIFF stores its actual multiplier, zero offset, unit, no-data, product, encoding version/profile, valid range, overflow count, source acquisition time, tile, provenance identity, and source product name. A raw array reader must decode exactly once using the embedded metadata. If authoritative multiplier metadata is absent, GET-Pak uses the product multiplier from the same [output_encoding] dictionary and records that settings_fallback was used. Rasterio's generic default scale of 1.0 is not treated as explicit metadata. Invalid or contradictory embedded encoding metadata, including a nonzero offset, is an error. Do not apply continuous scaling to OWT classes. Values that are non-finite, invalid under the existing quality rules, or outside the representable physical range become no-data and are counted in the metadata.
 
-The storage range protects against integer wraparound; it does not establish scientific validity of a retrieval at the highest concentration that can be stored.
+The storage range protects against integer wraparound; it does not establish scientific validity of a retrieval at the highest concentration that can be stored. The four-OWT Jiang/Zhang/Binding equations estimate SPM mass concentration and are not converted to nephelometric turbidity or NTU.
 
 ## Encoding settings
 

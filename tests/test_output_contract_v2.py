@@ -317,7 +317,7 @@ def test_current_version_and_zero_offset_without_factor_use_settings_fallback(tm
                        nodata=65535) as dst:
         dst.write(np.array([[100]], dtype="uint16"), 1)
         dst.update_tags(GETPAK_ENCODING_VERSION="GETPAK-ENC-2",
-                        ENCODING_PROFILE="standard", PHYSICAL_UNIT="NTU",
+                        ENCODING_PROFILE="standard", PHYSICAL_UNIT="mg L-1",
                         ADD_OFFSET="0")
     monkeypatch.setattr("getpak.automation.m.shp_stats",
                         lambda **kwargs: {"min": 100, "max": 100, "mean": 100,

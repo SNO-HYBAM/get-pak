@@ -1,3 +1,6 @@
+import json
+import importlib.resources as importlib_resources
+
 # Import CRS projection information from /data/s2_proj_ref.json
 s2proj_binary_data = importlib_resources.files(__name__).joinpath('s2_proj_ref.json')
 with s2proj_binary_data.open('rb') as fp:

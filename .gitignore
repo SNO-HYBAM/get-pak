@@ -48,6 +48,10 @@ htmlcov/
 .coverage
 .coverage.*
 .cache
+# Registered development worktrees are left intact and are not release contents.
+.mission_worktrees/
+# The manuscript is private publication material and is not a release-tree path.
+manuscript/
 nosetests.xml
 coverage.xml
 *.cover

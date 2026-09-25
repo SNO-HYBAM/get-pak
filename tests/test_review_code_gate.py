@@ -88,7 +88,7 @@ def write_mask(path, values, transform):
 def test_scaling_policy_round_trip_and_raster_metadata(tmp_path):
     values = np.array([np.nan, -1.0, 0.0, 0.1234, 1000.0, np.inf])
     encoded, metadata = Utils.to_uint16_scaled(
-        values, scale=100, unit='NTU', product='Turb',
+        values, scale=100, unit='mg L-1', product='Turb',
         return_metadata=True,
     )
     assert encoded.tolist() == [65535, 65535, 0, 12, 65535, 65535]
@@ -113,7 +113,7 @@ def test_scaling_policy_round_trip_and_raster_metadata(tmp_path):
     with rasterio.open(output) as source:
         assert source.nodata == 65535
         assert source.scales == pytest.approx((0.01,))
-        assert source.units == ('NTU',)
+        assert source.units == ('mg L-1',)
         assert source.tags()['OVERFLOW_COUNT'] == '1'
 
 
