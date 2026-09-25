@@ -1,12 +1,10 @@
 # GET-Pak
 
-This release-preparation line targets GET-Pak **v1.0.0**. The package, CLI, documentation, and synchronized SoftwareX manuscript use the same release version.
-
-GET-Pak turns atmospherically corrected Sentinel-2 MSI imagery into maps and summaries of inland-water quality. It produces suspended particulate matter (including OWT-SPM and HySPM), chlorophyll-a, reflectance, and optical water type (OWT) products, and can summarize them over regions of interest (ROIs). The four-OWT OWT-SPM product keeps the legacy `Turb` directory/key for backward-compatible filenames, but its physical unit is mg L-1; external field turbidity remains a distinct NTU quantity.
+GET-Pak v1.0.0 turns atmospherically corrected Sentinel-2 MSI imagery into maps and summaries of inland-water quality. It produces suspended particulate matter (including OWT-SPM and HySPM), chlorophyll-a, reflectance, and optical water type (OWT) products, and can summarize them over regions of interest (ROIs). The four-OWT OWT-SPM product keeps the legacy `Turb` directory/key for backward-compatible filenames, but its physical unit is mg L-1; external field turbidity remains a distinct NTU quantity.
 
 It supports automated batch processing from GRS NetCDF products and from ACOLITE L2R NetCDF products. A SeaDAS reader is available for interactive workflows; SeaDAS batch processing is not part of the settings-driven command. GET-Pak does not run GRS or ACOLITE itself.
 
-![GET-Pak workflow](img/get-pak-workflow.png)
+![GET-Pak structure](img/GET-Pak_structure.png)
 
 ## Install
 
