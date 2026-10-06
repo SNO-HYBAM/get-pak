@@ -493,3 +493,153 @@ def test_report_handles_missing_standard_raster_and_mixed_custom_rows(monkeypatc
     assert water.cell(rows['B'], headers.index('example_equation_01_status') + 1).value == 'missing raster'
     assert workbook['Water quality'].freeze_panes == 'C2'
     assert workbook['Processing details'].freeze_panes == 'F2'
+
+
+@pytest.mark.parametrize("name, timestamp", [
+    ("SENTINEL2A_20190310-144505-649_L2A_T20LLQ_C_V4-0_water_mask.tif",
+     "20190310T144505"),
+    ("WD_20190310T144505_T20LLQ_water_mask.tif", "20190310T144505"),
+    ("WD_2019-03-10T14:45:05_T20LLQ_water_mask.tif", "20190310T144505"),
+    ("WD_20190310144505_T20LLQ_water_mask.tif", "20190310T144505"),
+    ("WD_20190310_T20LLQ_water_mask.tif", None),
+])
+def test_waterdetect_date_formats(name, timestamp):
+    assert Pipelines._timestamp_from_name(name) == timestamp
+    assert Pipelines._mask_date_from_name(name) == "20190310"
+
+
+def test_waterdetect_discovery_parses_dates_independent_of_name_position(tmp_path):
+    masks = [
+        tmp_path / "SENTINEL2A_20190310-144505-649_T20LLQ_water_mask.tif",
+        tmp_path / "WD_2019-03-11T14:45:05_T20LLQ_water_mask.tif",
+    ]
+    for path in masks:
+        path.touch()
+    dates, found = Methods.get_waterdetect_masks(tmp_path)
+    assert dates == ["20190310", "20190311"]
+    assert found == masks
+
+
+@pytest.mark.parametrize("policy", ["merge", "recent", "maximize_pixels"])
+def test_ambiguous_policy_retains_scene_and_provenance(
+        monkeypatch, tmp_path, policy):
+    pipeline, config = make_pipeline(monkeypatch, tmp_path, processor="GRS")
+    config["processing"]["mask_ambiguity"] = policy
+    record = scene("one.nc", datetime(2019, 3, 10, 14, 45, 5))
+    monkeypatch.setattr(pipeline, "discover_input_files", lambda: [record])
+    masks = [
+        tmp_path / "SENTINEL2A_20190310-144505-649_L2A_T20LLQ_C_V2-0_water_mask.tif",
+        tmp_path / "SENTINEL2A_20190310-144505-649_L2A_T20LLQ_C_V4-0_water_mask.tif",
+        tmp_path / "SENTINEL2B_20190310-144505-649_L2A_T20LLQ_C_V5-0_water_mask.tif",
+    ]
+    for path in masks:
+        path.touch()
+    monkeypatch.setattr(
+        "getpak.automation.m.get_waterdetect_masks",
+        lambda input_folder: (["20190310"] * len(masks), masks),
+    )
+    matches, _, _, _ = pipeline.get_matchups(do_return=True)
+    assert len(matches) == 1
+    entry = pipeline.scene_ledger[0]
+    assert entry["status"] == "matched"
+    assert entry["candidate_masks"] == list(map(str, masks[:2]))
+    assert entry["mask_ambiguity_policy"] == policy
+    if policy == "recent":
+        assert entry["mask_selection_status"] == "resolved"
+        assert entry["mask_recent_timestamp_source"] in {
+            "creation_time", "modification_time"
+        }
+    else:
+        assert entry["mask_selection_status"] == "pending_scene_read"
+
+
+def test_recent_uses_mtime_when_birth_time_unavailable(monkeypatch):
+    from types import SimpleNamespace
+
+    times = {"A.tif": 100, "B.tif": 200}
+    monkeypatch.setattr(
+        Path, "stat",
+        lambda path: SimpleNamespace(st_mtime_ns=times[path.name]),
+    )
+    selected, details = Pipelines._recent_mask([
+        {"path": Path("A.tif")}, {"path": Path("B.tif")}
+    ])
+    assert selected["path"] == Path("B.tif")
+    assert details["mask_recent_timestamp_source"] == "modification_time"
+
+
+def test_merge_unions_water_classes_without_changing_source(monkeypatch, tmp_path):
+    pipeline, _ = make_pipeline(monkeypatch, tmp_path)
+    rrs = rrs_dataset()
+    transform = rrs.attrs["trans"]
+    first = write_mask(
+        tmp_path / "first.tif",
+        np.array([[1, 0, 0], [0, 0, 0]], dtype="uint8"),
+        transform,
+    )
+    second = write_mask(
+        tmp_path / "second.tif",
+        np.array([[0, 1, 0], [0, 0, 1]], dtype="uint8"),
+        transform,
+    )
+    output, details = pipeline._merge_scene_masks(
+        rrs, [first, second], "scene_one"
+    )
+    with rasterio.open(output) as merged:
+        assert merged.read(1).tolist() == [[1, 1, 0], [0, 0, 1]]
+    assert details["merged_water_pixels"] == 3
+    assert details["candidate_mask_water_pixels"] == {
+        str(first): 1, str(second): 2
+    }
+    assert bool((rrs["Red"] == 1).all())
+
+
+def test_maximize_pixels_uses_existing_filters_without_changing_source(tmp_path):
+    rrs = rrs_dataset()
+    for band in (
+        "Aerosol", "Blue", "Green", "RedEdge1",
+        "RedEdge2", "RedEdge3", "Nir2",
+    ):
+        rrs[band] = rrs["Red"] * 0 + 0.01
+    rrs["Red"].data = np.array([[0.01, 0.01, 0.01], [0.01, 0.01, -0.01]])
+    first = write_mask(
+        tmp_path / "first.tif",
+        np.array([[1, 1, 0], [0, 0, 0]], dtype="uint8"),
+        rrs.attrs["trans"],
+    )
+    second = write_mask(
+        tmp_path / "second.tif",
+        np.array([[0, 0, 0], [0, 1, 1]], dtype="uint8"),
+        rrs.attrs["trans"],
+    )
+    chosen, details = Pipelines._maximize_scene_mask(rrs, [first, second])
+    assert chosen == first
+    assert details["candidate_mask_scores"][str(first)]["usable_pixels"] == 2
+    assert details["candidate_mask_scores"][str(second)]["usable_pixels"] == 1
+    assert rrs["Red"].values[1, 2] == -0.01
+
+
+def test_hyphenated_timestamp_separates_same_day_acquisitions(
+        monkeypatch, tmp_path):
+    pipeline, _ = make_pipeline(monkeypatch, tmp_path, processor="GRS")
+    record = scene("one.nc", datetime(2024, 1, 1, 10, 0, 0))
+    monkeypatch.setattr(pipeline, "discover_input_files", lambda: [record])
+    masks = [
+        Path("SENTINEL2A_20240101-100000-123_L2A_T20LLQ_C_V4-0_water_mask.tif"),
+        Path("SENTINEL2A_20240101-110000-123_L2A_T20LLQ_C_V4-0_water_mask.tif"),
+    ]
+    monkeypatch.setattr(
+        "getpak.automation.m.get_waterdetect_masks",
+        lambda input_folder: (["20240101", "20240101"], masks),
+    )
+    matches, _, _, _ = pipeline.get_matchups(do_return=True)
+    assert len(matches) == 1
+    assert pipeline.scene_ledger[0]["mask_path"] == str(masks[0])
+    assert pipeline.scene_ledger[0]["mask_match_type"] == "exact"
+
+
+def test_invalid_mask_ambiguity_policy_is_rejected(monkeypatch, tmp_path):
+    pipeline, config = make_pipeline(monkeypatch, tmp_path)
+    config["processing"]["mask_ambiguity"] = "unknown"
+    with pytest.raises(ValueError, match="mask_ambiguity"):
+        _ = pipeline.mask_ambiguity

@@ -199,6 +199,18 @@ class Pipelines:
         return mode
 
     @property
+    def mask_ambiguity(self):
+        policy = str(
+            self.settings.get('processing', {}).get('mask_ambiguity', 'skip')
+        ).strip().lower()
+        if policy not in {'skip', 'merge', 'recent', 'maximize_pixels'}:
+            raise ValueError(
+                "mask_ambiguity must be 'skip', 'merge', 'recent', "
+                "or 'maximize_pixels'."
+            )
+        return policy
+
+    @property
     def static_mask(self):
         processing = self.settings.get('processing', {})
         modern = processing.get('static_mask_path')
@@ -236,10 +248,184 @@ class Pipelines:
 
     @staticmethod
     def _timestamp_from_name(path):
+        # WaterDetect uses YYYYMMDD-HHMMSS-sss; other sources use T.
+        # Date-only mask names have no acquisition timestamp.
         match = re.search(
-            r'(20\d{6}T\d{6})', os.path.basename(os.fspath(path))
+            r'(?<!\d)(20\d{2})-?(\d{2})-?(\d{2})'
+            r'[T _-]?(\d{2}):?(\d{2}):?(\d{2})(?!\d)',
+            os.path.basename(os.fspath(path)),
         )
-        return match.group(1) if match else None
+        if not match:
+            return None
+        year, month, day, hour, minute, second = match.groups()
+        return f'{year}{month}{day}T{hour}{minute}{second}'
+
+    @staticmethod
+    def _mask_date_from_name(path):
+        match = re.search(
+            r'(?<!\d)(20\d{2})-?(\d{2})-?(\d{2})',
+            Path(path).name,
+        )
+        return ''.join(match.groups()) if match else None
+
+    @staticmethod
+    def _mask_mission(path):
+        match = re.search(r'SENTINEL2([ABC])', Path(path).name, re.I)
+        return f'S2{match.group(1).upper()}' if match else None
+
+    @staticmethod
+    def _recent_mask(candidates):
+        # Linux birth time is optional. Compare the same timestamp type
+        # for every candidate, and use the path for deterministic ties.
+        stats = [(item, Path(item['path']).stat()) for item in candidates]
+        has_birthtime = all(
+            getattr(stat, 'st_birthtime_ns', None) is not None
+            or getattr(stat, 'st_birthtime', None) is not None
+            for _, stat in stats
+        )
+        source = 'creation_time' if has_birthtime else 'modification_time'
+
+        def timestamp_ns(stat):
+            if has_birthtime:
+                value = getattr(stat, 'st_birthtime_ns', None)
+                return int(value) if value is not None else int(stat.st_birthtime * 1e9)
+            return stat.st_mtime_ns
+
+        chosen, stat = max(
+            stats, key=lambda pair: (timestamp_ns(pair[1]), str(pair[0]['path']))
+        )
+        return chosen, {
+            'mask_recent_timestamp_source': source,
+            'candidate_mask_timestamps_ns': {
+                str(item['path']): timestamp_ns(item_stat)
+                for item, item_stat in stats
+            },
+        }
+
+    def _merge_scene_masks(self, rrs_source, candidates, record_id):
+        """Write a scene-grid union of the water class from compatible masks."""
+        import rasterio
+        import rioxarray as rxr
+        from rasterio.enums import Resampling
+
+        scene = rrs_source.rio.write_crs(
+            rrs_source.attrs['proj'], inplace=False
+        )
+        water = np.zeros(rrs_source['Red'].shape, dtype=bool)
+        counts = {}
+        for path in candidates:
+            mask = rxr.open_rasterio(path, masked=True)
+            try:
+                if 'band' in mask.dims and mask.sizes['band'] == 1:
+                    mask = mask.squeeze('band', drop=True)
+                if mask.rio.crs is None:
+                    raise ValueError('missing mask CRS')
+                values = np.asarray(mask.values)
+                valid = np.unique(values[np.isfinite(values)])
+                if not set(valid.tolist()).issubset({0, 1}):
+                    raise ValueError('mask has classes other than 0 and 1')
+                aligned = mask.rio.reproject_match(
+                    scene, resampling=Resampling.nearest
+                )
+                candidate_water = np.asarray(aligned.values) == 1
+                counts[str(path)] = int(np.count_nonzero(candidate_water))
+                water |= candidate_water
+            finally:
+                mask.close()
+        if not np.any(water):
+            raise ValueError('Merged masks contain no water pixels on the scene grid.')
+
+        destination = (
+            Path(self.output_folder) / self.tile_id / 'mask_selection'
+            / f'{self.INSTANCE_TIME_TAG}_{record_id}_merged_water_mask.tif'
+        )
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.exists():
+            raise FileExistsError(f'Merged mask output already exists: {destination}')
+        with rasterio.open(
+            destination, 'w', driver='GTiff',
+            height=water.shape[0], width=water.shape[1], count=1,
+            dtype='uint8', nodata=255, crs=scene.rio.crs,
+            transform=scene.rio.transform(), compress='deflate',
+        ) as output:
+            output.write(water.astype('uint8'), 1)
+        return destination, {
+            'candidate_mask_water_pixels': counts,
+            'merged_water_pixels': int(np.count_nonzero(water)),
+            'mask_merge_operator': 'water_class_union',
+        }
+
+    @staticmethod
+    def _maximize_scene_mask(rrs_source, candidates):
+        """Rank candidates by valid eight-band pixels after existing filters."""
+        scores = {}
+        bands = (
+            'Aerosol', 'Blue', 'Green', 'Red', 'RedEdge1',
+            'RedEdge2', 'RedEdge3', 'Nir2',
+        )
+        for path in candidates:
+            masked = None
+            filtered = None
+            try:
+                masked, status = m.intersect_watermask(
+                    rrs_dict=rrs_source, water_mask_dir=path,
+                    return_status=True,
+                )
+                if masked is None:
+                    scores[str(path)] = {'status': status, 'usable_pixels': 0}
+                    continue
+                filtered = m.filter_pixels(
+                    rrs_dict=masked, neg_rrs='Red', low_rrs=True,
+                    low_rrs_thresh=0.002,
+                    low_rrs_bands=[
+                        'Aerosol', 'Blue', 'Green', 'Red',
+                        'RedEdge1', 'RedEdge2',
+                    ],
+                )
+                usable = np.logical_and.reduce([
+                    np.isfinite(m._quick_rrs(filtered, bname=band))
+                    for band in bands
+                ])
+                scores[str(path)] = {
+                    'status': 'matched',
+                    'usable_pixels': int(np.count_nonzero(usable)),
+                }
+            except Exception as error:
+                scores[str(path)] = {
+                    'status': 'error', 'usable_pixels': 0,
+                    'error': str(error),
+                }
+            finally:
+                if filtered is not None and hasattr(filtered, 'close'):
+                    filtered.close()
+                if (masked is not None and masked is not filtered
+                        and hasattr(masked, 'close')):
+                    masked.close()
+        viable = [
+            path for path in candidates
+            if scores[str(path)]['status'] == 'matched'
+            and scores[str(path)]['usable_pixels'] > 0
+        ]
+        if not viable:
+            raise ValueError(
+                'No candidate mask retains a usable eight-band pixel '
+                f'after the existing filters: {scores}'
+            )
+        selected = max(
+            viable,
+            key=lambda path: (scores[str(path)]['usable_pixels'], str(path)),
+        )
+        return Path(selected), {'candidate_mask_scores': scores}
+
+    def _resolve_ambiguous_scene_mask(self, rrs_source, entry):
+        candidates = [Path(path) for path in entry['candidate_masks']]
+        if entry['mask_ambiguity_policy'] == 'merge':
+            return self._merge_scene_masks(
+                rrs_source, candidates, entry['record_id']
+            )
+        if entry['mask_ambiguity_policy'] == 'maximize_pixels':
+            return self._maximize_scene_mask(rrs_source, candidates)
+        raise ValueError('No deferred mask-selection policy is configured.')
 
     @staticmethod
     def _rrs_diagnostics(rrs_dict, bands):
@@ -649,10 +835,11 @@ class Pipelines:
             )
             mask_records = [
                 {
-                    'date': date,
+                    'date': self._mask_date_from_name(path) or date,
                     'path': path,
                     'tile': m._tile_from_name(path),
                     'timestamp': self._timestamp_from_name(path),
+                    'mission': self._mask_mission(path),
                 }
                 for date, path in zip(wd_dates, wd_masks)
             ]
@@ -689,6 +876,9 @@ class Pipelines:
                     item for item in mask_records
                     if item['date'] == info['str_date']
                     and item['tile'] in {None, tile}
+                    and item['mission'] in {
+                        None, str(info.get('mission', '')).upper()
+                    }
                 ]
                 if candidates:
                     acquired = info['pydate']
@@ -711,12 +901,30 @@ class Pipelines:
                         entry['mask_match_type'] = 'ambiguous_same_day'
 
             if len(candidates) > 1:
-                entry.update({
-                    'status': 'ambiguous_mask',
-                    'reason': 'multiple masks match this scene date/tile',
-                    'candidate_masks': [str(item['path']) for item in candidates],
-                })
-            elif len(candidates) == 1:
+                entry['candidate_masks'] = [
+                    str(item['path']) for item in candidates
+                ]
+                policy = self.mask_ambiguity
+                entry['mask_ambiguity_policy'] = policy
+                if policy == 'skip':
+                    entry.update({
+                        'status': 'ambiguous_mask',
+                        'reason': 'multiple masks match this scene date/tile',
+                    })
+                elif policy == 'recent':
+                    selected, details = self._recent_mask(candidates)
+                    entry.update(details)
+                    candidates = [selected]
+                    entry['mask_selection_status'] = 'resolved'
+                else:
+                    # Merge and maximize_pixels require the decoded scene grid.
+                    candidates = [candidates[0]]
+                    entry['mask_selection_status'] = 'pending_scene_read'
+                if policy != 'skip':
+                    entry['mask_match_type'] = (
+                        entry.get('mask_match_type', 'same_day') + '_' + policy
+                    )
+            if len(candidates) == 1:
                 mask_path = str(candidates[0]['path'])
                 entry.update({
                     'mask_path': mask_path,
@@ -887,6 +1095,16 @@ class Pipelines:
                     results[key]['grid_validation'] = grid_validation
 
                 mask_start = time.perf_counter()
+                if ledger_entry.get('mask_selection_status') == 'pending_scene_read':
+                    resolved_path, selection_details = (
+                        self._resolve_ambiguous_scene_mask(rrs_source, ledger_entry)
+                    )
+                    ledger_entry.update(selection_details)
+                    ledger_entry['mask_path'] = str(resolved_path)
+                    ledger_entry['mask_selection_status'] = 'resolved'
+                    str_matches[key]['WM'] = str(resolved_path)
+                    matches[key]['WM'] = Path(resolved_path)
+                    results[key]['WM'] = str(resolved_path)
                 print(f'Intersecting image with water mask...')
                 grs, mask_status = m.intersect_watermask(
                     rrs_dict=rrs_source,

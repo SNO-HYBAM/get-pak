@@ -56,7 +56,18 @@ s2_resolution = 20
 
 ## Water masks and ROIs
 
-By default, GET-Pak finds one WaterDetect mask for each scene date and tile. An exact acquisition timestamp is preferred when masks contain one. Ambiguous candidates are reported instead of being silently guessed.
+By default, GET-Pak finds one WaterDetect mask for each scene date and tile. It recognizes compact, hyphenated, and ISO-like dates and acquisition timestamps, including `YYYYMMDDTHHMMSS`, `YYYYMMDD-HHMMSS-sss`, and date-only masks. It matches the Sentinel-2 spacecraft when identified and prefers an exact acquisition timestamp. Ambiguous candidates are reported instead of being silently guessed.
+
+For a deliberate batch policy that processes duplicate same-acquisition masks, choose one of:
+
+```ini
+mask_ambiguity = skip
+# or: merge, recent, maximize_pixels
+```
+
+`skip` is the default. `merge` aligns all matching masks to the scene grid and writes the union of water-class pixels as a separate mask. `recent` uses filesystem creation time when available for every candidate, otherwise modification time; the ledger records which timestamp was used. `maximize_pixels` uses the candidate retaining the most finite eight-band pixels after the existing negative-red and low-reflectance filters. Ties use stable path order. These policies only resolve the input mask; the downstream filters and inversion are unchanged.
+
+The scene ledger records all candidate paths, the policy, and the selected or merged mask. For `merge` and `maximize_pixels`, selection is completed after the scene is read; a match-up-only preflight marks those decisions as pending. Scenes with no matching mask or no usable scene pixels can still fail. Mask selection is independent of in-situ validation scores.
 
 To use one deliberate reference mask for all scenes, enable static-mask mode and give its path:
 
