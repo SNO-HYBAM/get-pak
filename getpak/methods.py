@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import rasterio
 import numpy as np
@@ -1374,16 +1375,22 @@ class Methods:
                 for name in files:
                     if name.endswith('.tif') and '_water_mask' in name:
                         f = Path(os.path.join(root, name))
+                        date_match = re.search(
+                            r'(?<!\d)(20\d{2})-?(\d{2})-?(\d{2})',
+                            f.name,
+                        ) or re.search(
+                            r'(?<!\d)(20\d{2})-?(\d{2})-?(\d{2})',
+                            f.parent.parent.name,
+                        )
+                        if not date_match:
+                            continue
                         newname = f.parent.parent.name + '_water_mask.tif'
                         dest_plus_name = os.path.join(output_folder, newname)
                         # copying to new folder
                         shutil.copyfile(f, dest_plus_name)
                         # print(f'COPYING: {f} TO: {dest_plus_name}\n')
                         # appending the date and path
-                        nome = f.parent.parent.name.split('_')
-                        # check because for MAJA the dates are in position 2,
-                        #  while for other products it is 3
-                        date = nome[1][0:8] if nome[1][0] == '2' else nome[2][0:8]
+                        date = ''.join(date_match.groups())
                         wd_dates.append(date)
                         wd_masks_list.append(Path(dest_plus_name))
 
@@ -1392,11 +1399,13 @@ class Methods:
         else:
             for f in sorted(Path(input_folder).rglob('*_water_mask.tif')):
                 if f.is_file():
-                    file = f.name
-                    # appending the date and path
-                    nome = file.split(
-                        '_')  # check because for MAJA the dates are in position 2, while for other products it is 3
-                    date = nome[1][0:8] if nome[1][0] == '2' else nome[2][0:8]
+                    date_match = re.search(
+                        r'(?<!\d)(20\d{2})-?(\d{2})-?(\d{2})',
+                        f.name,
+                    )
+                    if not date_match:
+                        continue
+                    date = ''.join(date_match.groups())
                     wd_dates.append(date)
                     wd_masks_list.append(f)
             print(f'Found {len(wd_masks_list)} water masks in {input_folder}\n')
