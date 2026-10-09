@@ -86,8 +86,26 @@ class Raster:
 
     @staticmethod
     def array2tiff(ndarray_data, str_output_file, transform, projection, no_data=-1,
-                   compression='COMPRESS=PACKBITS', metadata=None):
-        """Write a single-band GeoTIFF with standard and GET-Pak metadata."""
+                   compression='LZW', metadata=None):
+        """
+        Given an input ndarray and the desired projection parameters, create a raster.tif using GDT_Float32.
+
+        Parameters
+        ----------
+        @param ndarray_data: Inform if the index should be saved as array in the output folder
+        @param str_output_file: string of the path of the file to be written
+        @param transform: rasterio affine transformation matrix (resolution and "upper left" coordinate)
+        @param projection: projection CRS
+        @param no_data: the value for no data
+        @param compression: type of file compression
+
+        @return: None (If all goes well, array2tiff should pass and generate a file inside @str_output_file)
+        """
+        # first, check if the vector is not float64
+
+        if ndarray_data.dtype == 'float64':
+            ndarray_data = ndarray_data.astype('float32')
+
         with rasterio.open(
             fp=str_output_file,
             mode='w',
@@ -100,6 +118,8 @@ class Raster:
             transform=transform,
             nodata=no_data,
             options=[compression],
+            tiled=True,
+            predictor=2
         ) as file:
             file.write(ndarray_data, 1)
             if metadata:
