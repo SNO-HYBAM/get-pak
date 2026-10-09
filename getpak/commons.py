@@ -31,8 +31,8 @@ class Utils:
         'encoding_version': 'GETPAK-ENC-2',
         'rrs_multiplier': 10000.0,
         'chla_multiplier': 100.0,
-        'turbidity_multiplier': 10.0,
-        'hyspm_multiplier': 10.0,
+        'turbidity_multiplier': 100.0,
+        'hyspm_multiplier': 100.0,
         'continuous_dtype': 'uint16',
         'continuous_nodata': 65535,
         'categorical_dtype': 'uint8',
@@ -827,6 +827,18 @@ class DefaultDicts:
                          'Nir2': "864",
                          'Swir1': "1610",
                          'Swir2': "2186"}
+
+    acolite_nc_s2cbands = {'Aerosol': "444",
+                         'Blue': "489",
+                         'Green': "561",
+                         'Red': "667",
+                         'RedEdge1': "707",
+                         'RedEdge2': "741",
+                         'RedEdge3': "785",
+                         'Nir1': "835",
+                         'Nir2': "866",
+                         'Swir1': "1612",
+                         'Swir2': "2191"}
 
     seadas_nc_s2abands = {'Aerosol': "443",
                          'Blue': "492",

@@ -1101,8 +1101,6 @@ class Methods:
                 turb[out] = np.nan
 
 
-
-
         elif alg == 'Jiang':
             if mode_Jiang == 'pixel':
                 turb = ifunc.spm_jiang2021(Aerosol=rrs_dict['Aerosol'].values,

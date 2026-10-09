@@ -229,7 +229,7 @@ def chl_OC2(Blue, Green, a=0.2389, b=-1.9369, c=1.7627, d=-3.0777, e=-0.1054,
     return _finish(chl, diagnostics, return_diagnostics)
 
 
-#### SPM ####
+#### SPM/Turbidity ####
 
 # Binding et al. (2010)
 def spm_binding2010(RedEdge2):
@@ -494,6 +494,42 @@ def spm_jiang2021_red(Aerosol, Blue, Green, Red, return_diagnostics=False):
     _count(diagnostics, "numerical_calculation_overflow", bbp_valid & ~np.isfinite(tss))
     return _finish(tss, diagnostics, return_diagnostics)
 
+def spm_jiang2021_rededge2(RedEdge2):
+    # Constants of water absorption and backscattering
+    aw = {"RedEdge2": 2.71167020}
+    bbw = {"RedEdge2": 0.00023499}
+
+    # Conversions and calculations:
+    bands = [RedEdge2]
+    band_names = ['RedEdge2']
+    # subsurface remote sensing reflectance
+    rrs = {wave: band / (0.52 + 1.7 * band) for wave, band in zip(band_names, bands)}
+    # ratio of backscattering coefficient to the sum of backscattering and absorption coefficients
+    u = {key: (-0.0895 + np.sqrt((0.089 ** 2) + 4 * 0.125 * value)) / (2 * 0.125) for key, value in rrs.items()}
+
+    bbp740 = (((u["RedEdge2"] * aw["RedEdge2"]) / (1 - u["RedEdge2"])) - bbw["RedEdge2"])
+    tss = 134.91845 * bbp740
+
+    return tss
+
+def spm_jiang2021_nir2(Nir2):
+    # Constants of water absorption and backscattering
+    aw = {"Nir2": 4.61714226}
+    bbw = {"Nir2": 0.00012066}
+
+    # Conversions and calculations:
+    bands = [Nir2]
+    band_names = ['Nir2']
+    # subsurface remote sensing reflectance
+    rrs = {wave: band / (0.52 + 1.7 * band) for wave, band in zip(band_names, bands)}
+    # ratio of backscattering coefficient to the sum of backscattering and absorption coefficients
+    u = {key: (-0.0895 + np.sqrt((0.089 ** 2) + 4 * 0.125 * value)) / (2 * 0.125) for key, value in rrs.items()}
+
+    bbp865 = ((u["Nir2"] * aw["Nir2"]) / (1 - u["Nir2"])) - bbw["Nir2"]
+    tss = 166.07382 * bbp865
+
+    return tss
+
 # SPM Alves e Santos 2024
 def spm_madeira(Red, Nir2):
     spm = 945.1 * ((Nir2 / Red) ** 1.9463)
@@ -553,7 +589,7 @@ def spm_s3(Red, Nir2, cutoff_value=0.027, cutoff_delta=0.007, low_params=None, h
     return _finish(spm, diagnostics, return_diagnostics)
 
 # SPM hibrid
-def spm_severo(Red, Nir2):
+def spm_beni_mamore(Red, Nir2):
     if (Nir2 / Red) > 0.3:
         spm = 16.01 * 2.71828 ^ (4.99 * Nir2 / Red)
     else:
@@ -561,7 +597,7 @@ def spm_severo(Red, Nir2):
 
     return spm
 
-def vectorized_spm_sev(Red, Nir2):
+def vectorized_spm_beni_mamore(Red, Nir2):
     # Ensure the inputs are numpy arrays (if not already)
     Red = np.asarray(Red)
     Nir2 = np.asarray(Nir2)
@@ -580,14 +616,6 @@ def vectorized_spm_sev(Red, Nir2):
 def spm_zhang2014(RedEdge1, a=362507, b=2.3222):
     spm = a * (RedEdge1 ** b)
     return spm
-
-# Secchi disk depth
-# def secchi_lee():
-#     """
-#
-#     """
-#
-#     return secchi
 
 functions = {
     'CHL_Gitelson2': {

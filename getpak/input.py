@@ -496,6 +496,7 @@ class ACOLITE_S2:
     def __init__(self, parent_log=None):
         self.acolite_nc_s2abands = dd.acolite_nc_s2abands
         self.acolite_nc_s2bbands = dd.acolite_nc_s2bbands
+        self.acolite_nc_s2cbands = dd.acolite_nc_s2cbands
 
     @classmethod
     def _filename_metadata(cls, path):
@@ -663,6 +664,8 @@ class ACOLITE_S2:
             bands = dd.acolite_nc_s2abands
         elif meta['mission'] == 'S2B':
             bands = dd.acolite_nc_s2bbands
+        elif meta['mission'] == 'S2C':
+            bands = dd.acolite_nc_s2cbands
         else:
             raise ValueError(f"Unsupported ACOLITE mission {meta['mission']!r}.")
 
@@ -695,7 +698,8 @@ class ACOLITE_S2:
                                    "conversion": "Rrs = rhos / pi"})
                 subset_dict[new_name] = band
         elif meta['prod_type'] == 'L2W':
-            if "Rrs_833" in ds.variables:
+            b_try = "Rrs_" + bands[0]
+            if b_try in ds.variables:
                 adjbands = {key: f"Rrs_{value}" for key, value in bands.items()}
                 subset_dict = {new_name: ds[var_name] for new_name, var_name in adjbands.items()}
                 meta['prod_type'] = 'Rrs'
