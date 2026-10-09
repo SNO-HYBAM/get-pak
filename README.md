@@ -1,8 +1,8 @@
 # GET-Pak
 
-GET-Pak v1.0.0 turns atmospherically corrected Sentinel-2 MSI imagery into maps and summaries of inland-water quality. It produces suspended particulate matter (including OWT-SPM and HySPM), chlorophyll-a, reflectance, and optical water type (OWT) products, and can summarize them over regions of interest (ROIs). The four-OWT OWT-SPM product keeps the legacy `Turb` directory/key for backward-compatible filenames, but its physical unit is mg L-1; external field turbidity remains a distinct NTU quantity.
+GET-Pak v1.0.0 turns atmospherically corrected Sentinel-2 MSI imagery into maps and summaries of inland-water quality. It produces reflectance, optical water types (OWTs), chlorophyll-a, suspended particulate matter, and turbidity products, and can summarize them over regions of interest (ROIs).
 
-It supports automated batch processing from GRS NetCDF products and from ACOLITE L2R NetCDF products. A SeaDAS reader is available for interactive workflows; SeaDAS batch processing is not part of the settings-driven command. GET-Pak does not run GRS or ACOLITE itself.
+It supports automated batch processing from GRS NetCDF products and from ACOLITE NetCDF products. A SeaDAS reader is available for interactive workflows; SeaDAS batch processing is not part of the settings-driven command. GET-Pak does not run GRS or ACOLITE itself.
 
 ![GET-Pak structure](img/GET-Pak_structure.png)
 
@@ -39,7 +39,7 @@ inputs/
 
 The configured tile is `50RKU`; the required GRS input layout is <inputs>/<tile>/*.nc, for example <inputs>/50RKU/*.nc. GET-Pak reads the acquisition time from the source metadata and uses it for filenames and reports.
 
-For ACOLITE, point `inputs` to a directory containing external `*_L2R.nc` products and set `ac_processor = ACOLITE`. ACOLITE products must contain usable sensor, tile, acquisition-time, projection, and reflectance metadata. Keep GRS and ACOLITE outputs in separate directories when comparing processors.
+For ACOLITE, point `inputs` to a directory containing external `*_L2W.nc` (containing Rrs data) or `*_L2R.nc` (contain surface reflectance data) products and set `ac_processor = ACOLITE`. ACOLITE products must contain usable sensor, tile, acquisition-time, projection, and Rrs metadata. Keep GRS and ACOLITE outputs in separate directories when comparing processors.
 
 A minimal ACOLITE processing section is:
 
@@ -65,7 +65,7 @@ mask_ambiguity = skip
 # or: merge, recent, maximize_pixels
 ```
 
-`skip` is the default. `merge` aligns all matching masks to the scene grid and writes the union of water-class pixels as a separate mask. `recent` uses filesystem creation time when available for every candidate, otherwise modification time; the ledger records which timestamp was used. `maximize_pixels` uses the candidate retaining the most finite eight-band pixels after the existing negative-red and low-reflectance filters. Ties use stable path order. These policies only resolve the input mask; the downstream filters and inversion are unchanged.
+`skip` is the default. `merge` aligns all matching masks to the scene grid and writes the union of water-class pixels as a separate mask. `recent` uses filesystem creation time when available for every candidate, otherwise modification time; the ledger records which timestamp was used. `maximize_pixels` uses the candidate retaining the most finite eight-band pixels after the existing negative-red and low-Rrs filters. Ties use stable path order. These policies only resolve the input mask; the downstream filters and inversion are unchanged.
 
 The scene ledger records all candidate paths, the policy, and the selected or merged mask. For `merge` and `maximize_pixels`, selection is completed after the scene is read; a match-up-only preflight marks those decisions as pending. Scenes with no matching mask or no usable scene pixels can still fail. Mask selection is independent of in-situ validation scores.
 
@@ -88,7 +88,7 @@ The scene ledger and output metadata record the original and selected transforms
 
 ## Outputs and filenames
 
-Products are written below `output/<tile>/` in their product directories (`OWT`, `OWTSPM`, `Chla`, `Turb`, `HySPM`, and optional Rrs-band directories). `Turb` is the legacy directory name for the four-OWT OWT-SPM product. New raster names follow this pattern:
+Products are written below `output/<tile>/` in their product directories (`OWT`, `SPM`, `Chla`, `Turb`, `HySPM`, and optional Rrs-band directories). New raster names follow this pattern:
 
 ```text
 <Product>_<YYYYMMDDTHHMMSS>_T<tile>_<record_id>.tif
@@ -112,13 +112,13 @@ New rasters use encoding version `GETPAK-ENC-2`. Continuous products are unsigne
 | --- | ---: | ---: | ---: | --- |
 | Rrs bands | 10,000 | stored value × 0.0001 | 65,535 | sr-1 |
 | Chlorophyll-a | 100 | stored value × 0.01 | 65,535 | mg m-3 |
-| OWT-SPM (`Turb` legacy key) | 10 | stored value × 0.1 | 65,535 | mg L-1 |
-| HySPM | 10 | stored value × 0.1 | 65,535 | mg L-1 |
+| Turb | 100 | stored value × 0.01 | 65,535 | NTU |
+| HySPM | 100 | stored value × 0.01 | 65,535 | mg L-1 |
 | OWT and OWTSPM | 1 | stored class code | 255 | class code |
 
 The GeoTIFF stores its actual multiplier, zero offset, unit, no-data, product, encoding version/profile, valid range, overflow count, source acquisition time, tile, provenance identity, and source product name. A raw array reader must decode exactly once using the embedded metadata. If authoritative multiplier metadata is absent, GET-Pak uses the product multiplier from the same [output_encoding] dictionary and records that settings_fallback was used. Rasterio's generic default scale of 1.0 is not treated as explicit metadata. Invalid or contradictory embedded encoding metadata, including a nonzero offset, is an error. Do not apply continuous scaling to OWT classes. Values that are non-finite, invalid under the existing quality rules, or outside the representable physical range become no-data and are counted in the metadata.
 
-The storage range protects against integer wraparound; it does not establish scientific validity of a retrieval at the highest concentration that can be stored. The four-OWT Jiang/Zhang/Binding equations estimate SPM mass concentration and are not converted to nephelometric turbidity or NTU.
+The storage range protects against integer wraparound; it does not establish scientific validity of a retrieval at the highest concentration that can be stored.
 
 ## Encoding settings
 
@@ -129,8 +129,8 @@ The optional [output_encoding] section is the only encoding configuration. When 
 encoding_version = GETPAK-ENC-2
 rrs_multiplier = 10000
 chla_multiplier = 100
-turbidity_multiplier = 10
-hyspm_multiplier = 10
+turbidity_multiplier = 100
+hyspm_multiplier = 100
 continuous_dtype = uint16
 continuous_nodata = 65535
 categorical_dtype = uint8
@@ -150,7 +150,7 @@ Optional custom demonstration equations are documented in docs/custom_equations.
 
 ## Troubleshooting
 
-**No inputs found:** confirm that the processor is correct, the configured tile matches the folder name, and GRS scenes are under `inputs/<tile>/`. ACOLITE inputs must be `*_L2R.nc` and contain matching tile metadata.
+**No inputs found:** confirm that the processor is correct, the configured tile matches the folder name, and GRS scenes are under `inputs/<tile>/`. ACOLITE inputs must be `*_L2W.nc` (if unavailable, `*_L2R.nc`) and contain matching tile metadata.
 
 **Mask mismatch or ambiguity:** check the mask date, tile, and acquisition timestamp. Remove duplicate candidates or enable static-mask mode with a compatible reference mask.
 
