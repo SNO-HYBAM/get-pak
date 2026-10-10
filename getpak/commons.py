@@ -33,8 +33,8 @@ class Utils:
         'chla_multiplier': 100.0,
         'turbidity_multiplier': 100.0,
         'hyspm_multiplier': 100.0,
-        'continuous_dtype': 'uint16',
-        'continuous_nodata': 65535,
+        'continuous_dtype': 'uint32',
+        'continuous_nodata': 4294967295,
         'categorical_dtype': 'uint8',
         'categorical_nodata': 255,
     }
@@ -106,7 +106,7 @@ class Utils:
         output = settings['output_encoding']
         print('Effective output encoding: '
               f"{output['encoding_version']} ({output['encoding_profile']}); "
-              'continuous uint16/65535, categorical uint8/255.')
+              f"continuous {output['continuous_dtype']}/{output['continuous_nodata']}, categorical uint8/255.")
         for item in Utils.encoding_summary(settings):
             print(
                 f"  {item['product']}: multiplier={item['multiplier']:g}, "
@@ -169,9 +169,9 @@ class Utils:
             output[key] = Utils._parse_positive_multiplier('output_encoding', key, output[key])
         output['continuous_dtype'] = str(output['continuous_dtype']).strip().lower()
         output['categorical_dtype'] = str(output['categorical_dtype']).strip().lower()
-        if output['continuous_dtype'] != 'uint16':
+        if output['continuous_dtype'] not in {'uint16', 'uint32'}:
             raise ValueError(
-                '[output_encoding] continuous_dtype must be uint16; '
+                '[output_encoding] continuous_dtype must be uint16 or uint32; '
                 f'got {output["continuous_dtype"]!r}.'
             )
         if output['categorical_dtype'] != 'uint8':
@@ -179,9 +179,17 @@ class Utils:
                 '[output_encoding] categorical_dtype must be uint8; '
                 f'got {output["categorical_dtype"]!r}.'
             )
+        continuous_max = int(np.iinfo(output['continuous_dtype']).max)
+        if 'continuous_nodata' not in output_raw:
+            output['continuous_nodata'] = continuous_max
         output['continuous_nodata'] = Utils._parse_exact_integer(
-            'output_encoding', 'continuous_nodata', output['continuous_nodata'], 65535
+            'output_encoding', 'continuous_nodata', output['continuous_nodata'], continuous_max
         )
+        presentation = str(config.get('processing', {}).get('owt_product', 'turbidity')).strip().lower()
+        if presentation not in {'turbidity', 'spm'}:
+            raise ValueError('[processing] owt_product must be turbidity or spm.')
+        output['owt_product'] = presentation
+        output['owt_unit'] = 'NTU' if presentation == 'turbidity' else 'mg L-1'
         output['categorical_nodata'] = Utils._parse_exact_integer(
             'output_encoding', 'categorical_nodata', output['categorical_nodata'], 255
         )
@@ -190,7 +198,7 @@ class Utils:
         output['encoding_profile'] = (
             'standard' if all(output[key] == float(standard[key]) for key in (
                 'rrs_multiplier', 'chla_multiplier',
-                'turbidity_multiplier', 'hyspm_multiplier')) else 'custom'
+                'turbidity_multiplier', 'hyspm_multiplier')) and output['continuous_dtype'] == standard['continuous_dtype'] else 'custom'
         )
         output['resolution'] = {
             key: 1.0 / output[key]
@@ -198,7 +206,7 @@ class Utils:
                         'turbidity_multiplier', 'hyspm_multiplier')
         }
         output['maximum_physical_value'] = {
-            key: 65534.0 / output[key]
+            key: (continuous_max - 1) / output[key]
             for key in ('rrs_multiplier', 'chla_multiplier',
                         'turbidity_multiplier', 'hyspm_multiplier')
         }
@@ -228,7 +236,7 @@ class Utils:
         output = settings["output_encoding"]
         units = {
             "rrs_multiplier": "sr-1", "chla_multiplier": "mg m-3",
-            "turbidity_multiplier": "mg L-1", "hyspm_multiplier": "mg L-1",
+            "turbidity_multiplier": output['owt_unit'], "hyspm_multiplier": "mg L-1",
         }
         return [
             {
@@ -239,7 +247,7 @@ class Utils:
             }
             for product, key in (
                 ("Rrs bands", "rrs_multiplier"), ("Chl-a", "chla_multiplier"),
-                ("OWT-SPM (legacy Turb)", "turbidity_multiplier"),
+                ("OWT-Turbidity" if output['owt_product'] == 'turbidity' else "OWT-SPM", "turbidity_multiplier"),
                 ("HySPM", "hyspm_multiplier"),
             )
         ]
@@ -269,21 +277,34 @@ class Utils:
     @staticmethod
     def to_uint16_scaled(arr, scale=10000, nodata=65535, unit='1',
                          product='unknown', return_metadata=False):
-        """Encode a continuous product using the GETPAK-ENC-2 uint16 contract."""
+        """Compatibility wrapper for the original uint16 encoding."""
+        return Utils.to_uint_scaled(arr, scale=scale, nodata=nodata, unit=unit,
+                                    product=product, return_metadata=return_metadata, dtype='uint16')
+
+    @staticmethod
+    def to_uint_scaled(arr, scale=10000, nodata=None, unit='1',
+                       product='unknown', return_metadata=False, dtype='uint32'):
+        """Encode uint16/uint32 values; reserve the highest code for nodata."""
         try:
             scale = float(scale)
         except (TypeError, ValueError) as exc:
             raise ValueError('scale must be a finite positive number') from exc
         if not math.isfinite(scale) or scale <= 0:
             raise ValueError('scale must be a finite positive number')
-        if int(nodata) != 65535:
-            raise ValueError('UInt16 scaled products reserve nodata=65535 exclusively.')
+        dtype = np.dtype(dtype)
+        if dtype.name not in {'uint16', 'uint32'}:
+            raise ValueError('Scaled products require uint16 or uint32.')
+        dtype_max = int(np.iinfo(dtype).max)
+        if nodata is None:
+            nodata = dtype_max
+        if int(nodata) != dtype_max:
+            raise ValueError(f'{dtype.name} scaled products reserve nodata={dtype_max} exclusively.')
 
         values = np.asarray(arr, dtype=float)
         finite = np.isfinite(values)
         negative = finite & (values < 0)
         valid = finite & ~negative
-        max_code = 65534
+        max_code = dtype_max - 1
         physical_max = max_code / float(scale)
         finite_values = values[finite]
         physical_min = float(np.min(finite_values)) if finite_values.size else None
@@ -291,9 +312,9 @@ class Utils:
         overflow = valid & (values > physical_max)
         rounded = np.rint(np.where(valid, values * scale, 0.0))
 
-        encoded = np.full(values.shape, nodata, dtype=np.uint16)
+        encoded = np.full(values.shape, nodata, dtype=dtype)
         encodable = valid & ~overflow
-        encoded[encodable] = rounded[encodable].astype(np.uint16)
+        encoded[encodable] = rounded[encodable].astype(dtype)
         metadata = {
             'product': str(product),
             'physical_unit': str(unit),
@@ -308,7 +329,7 @@ class Utils:
             'overflow_policy': 'finite physical overflow maps to nodata',
             'resolution': float(1.0 / scale),
             'maximum_physical_value': float(physical_max),
-            'dtype': 'uint16',
+            'dtype': dtype.name,
             'raster_scale': float(1.0 / scale),
             'invalid_count': int((~finite).sum()),
             'negative_count': int(negative.sum()),

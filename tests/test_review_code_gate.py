@@ -435,7 +435,7 @@ def test_pipeline_persists_pre_qc_diagnostics_and_invalid_outputs(monkeypatch, t
     assert result["rrs_diagnostics"]["Red"]["neg_count"] == 1
     assert result["rrs_diagnostics"]["Red"]["finite_count"] == 4
     with rasterio.open(result["Chla"]) as source:
-        assert source.nodata == 65535
+        assert source.nodata == 4294967295
         assert source.read_masks(1)[0, 0] == 0
         assert source.read_masks(1)[0, 1] == 0
     assert "scene_rrs_Red_neg_count;1" in Path(result["npix"]).read_text()

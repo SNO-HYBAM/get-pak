@@ -190,3 +190,26 @@ def test_water_mask_overlap_and_no_overlap(tmp_path):
     assert Methods.intersect_watermask(rrs, distant) is None
     masked.close()
     rrs.close()
+
+
+@pytest.mark.parametrize('mission,product', [('S2B', 'L2W'), ('S2C', 'L2R')])
+def test_contributed_acolite_reader_paths(tmp_path, mission, product):
+    from getpak.commons import DefaultDicts
+    path = write_acolite(tmp_path / 'base.nc')
+    with xr.open_dataset(path, engine='h5netcdf') as source:
+        ds = source.load()
+    if mission == 'S2C':
+        mapping = DefaultDicts.acolite_nc_s2cbands
+        ds = ds.rename({f'rhos_{S2B_BANDS[band]}': f'rhos_{wave}'
+                        for band, wave in mapping.items()})
+    else:
+        ds = ds.rename({f'rhos_{wave}': f'Rrs_{wave}' for wave in S2B_BANDS.values()})
+    ds.attrs.update(sensor=f'{mission}_MSI', acolite_file_type=product)
+    target = tmp_path / f'{mission}_MSI_2024_06_06_14_45_27_T20LLQ_{product}.nc'
+    ds.to_netcdf(target, engine='h5netcdf')
+    rrs, meta, crs, transform = ACOLITE_S2().get_aco_dict(target)
+    assert meta['mission'] == mission
+    assert rrs['Blue'].isel(y=1, x=1).compute().item() == pytest.approx(
+        0.02 if product == 'L2W' else 0.02 / np.pi)
+    assert crs.to_epsg() == 32720
+    rrs.close()

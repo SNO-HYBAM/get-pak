@@ -39,7 +39,7 @@ inputs/
 
 The configured tile is `50RKU`; the required GRS input layout is <inputs>/<tile>/*.nc, for example <inputs>/50RKU/*.nc. GET-Pak reads the acquisition time from the source metadata and uses it for filenames and reports.
 
-For ACOLITE, point `inputs` to a directory containing external `*_L2W.nc` (containing Rrs data) or `*_L2R.nc` (contain surface reflectance data) products and set `ac_processor = ACOLITE`. ACOLITE products must contain usable sensor, tile, acquisition-time, projection, and Rrs metadata. Keep GRS and ACOLITE outputs in separate directories when comparing processors.
+For ACOLITE batch processing, point `inputs` to a directory containing external `*_L2R.nc` surface-reflectance products and set `ac_processor = ACOLITE`. ACOLITE products must contain usable sensor, tile, acquisition-time, projection, and Rrs metadata. Keep GRS and ACOLITE outputs in separate directories when comparing processors.
 
 A minimal ACOLITE processing section is:
 
@@ -88,7 +88,7 @@ The scene ledger and output metadata record the original and selected transforms
 
 ## Outputs and filenames
 
-Products are written below `output/<tile>/` in their product directories (`OWT`, `SPM`, `Chla`, `Turb`, `HySPM`, and optional Rrs-band directories). New raster names follow this pattern:
+Products are written below `output/<tile>/` in their product directories (`OWT`, `OWTSPM`, `Chla`, `Turb`, `HySPM`, and optional Rrs-band directories). New raster names follow this pattern:
 
 ```text
 <Product>_<YYYYMMDDTHHMMSS>_T<tile>_<record_id>.tif
@@ -106,14 +106,14 @@ Each run also writes a scene ledger named `<run>_scene_ledger.json`, a timing ma
 
 ## Raster values and no-data
 
-New rasters use encoding version `GETPAK-ENC-2`. Continuous products are unsigned 16-bit rasters with `65535` as no-data; zero is a valid physical value. Categorical OWT products are unsigned 8-bit rasters with `255` as no-data; class zero is preserved when it is a valid class.
+New rasters use encoding version `GETPAK-ENC-2`. Continuous products default to unsigned 32-bit rasters with `4294967295` as no-data; zero is a valid physical value. Categorical OWT products are unsigned 8-bit rasters with `255` as no-data; class zero is preserved when it is a valid class.
 
 | Product | Stored multiplier | Decode physical value | No-data | Unit |
 | --- | ---: | ---: | ---: | --- |
-| Rrs bands | 10,000 | stored value × 0.0001 | 65,535 | sr-1 |
-| Chlorophyll-a | 100 | stored value × 0.01 | 65,535 | mg m-3 |
-| Turb | 100 | stored value × 0.01 | 65,535 | NTU |
-| HySPM | 100 | stored value × 0.01 | 65,535 | mg L-1 |
+| Rrs bands | 10,000 | stored value × 0.0001 | 4,294,967,295 | sr-1 |
+| Chlorophyll-a | 100 | stored value × 0.01 | 4,294,967,295 | mg m-3 |
+| Turb (OWT product) | 100 | stored value × 0.01 | 4,294,967,295 | NTU or mg L-1, selected in settings |
+| HySPM | 100 | stored value × 0.01 | 4,294,967,295 | mg L-1 |
 | OWT and OWTSPM | 1 | stored class code | 255 | class code |
 
 The GeoTIFF stores its actual multiplier, zero offset, unit, no-data, product, encoding version/profile, valid range, overflow count, source acquisition time, tile, provenance identity, and source product name. A raw array reader must decode exactly once using the embedded metadata. If authoritative multiplier metadata is absent, GET-Pak uses the product multiplier from the same [output_encoding] dictionary and records that settings_fallback was used. Rasterio's generic default scale of 1.0 is not treated as explicit metadata. Invalid or contradictory embedded encoding metadata, including a nonzero offset, is an error. Do not apply continuous scaling to OWT classes. Values that are non-finite, invalid under the existing quality rules, or outside the representable physical range become no-data and are counted in the metadata.
@@ -122,7 +122,7 @@ The storage range protects against integer wraparound; it does not establish sci
 
 ## Encoding settings
 
-The optional [output_encoding] section is the only encoding configuration. When it is absent, the standard values below are used. Supplied multipliers must be finite and positive; continuous storage remains uint16 with 65535 no-data, and categorical storage remains uint8 with 255 no-data.
+The optional [output_encoding] section is the only encoding configuration. When it is absent, the standard values below are used. Supplied multipliers must be finite and positive; continuous storage supports uint16 with 65535 no-data or uint32 with 4294967295 no-data, and categorical storage remains uint8 with 255 no-data.
 
 ```ini
 [output_encoding]
@@ -131,13 +131,25 @@ rrs_multiplier = 10000
 chla_multiplier = 100
 turbidity_multiplier = 100
 hyspm_multiplier = 100
-continuous_dtype = uint16
-continuous_nodata = 65535
+continuous_dtype = uint32
+continuous_nodata = 4294967295
 categorical_dtype = uint8
 categorical_nodata = 255
 ```
 
-The effective profile, physical resolution (1 / multiplier), and maximum (65534 / multiplier) are shown when settings are read. Standard multipliers use profile standard; changed multipliers use profile custom under the same GETPAK-ENC-2 schema. For example, multiplier 5 supports 7000 mg L-1 at 0.2 mg L-1 resolution for HySPM, and multiplier 50 supports 1000 mg m-3 at 0.02 mg m-3 resolution for Chl-a. These are supported storage examples, not claims about retrieval validity.
+The effective profile, physical resolution (1 / multiplier), and maximum ((dtype maximum - 1) / multiplier) are shown when settings are read. Standard multipliers use profile standard; changed multipliers use profile custom under the same GETPAK-ENC-2 schema. For example, multiplier 5 supports 7000 mg L-1 at 0.2 mg L-1 resolution for HySPM, and multiplier 50 supports 1000 mg m-3 at 0.02 mg m-3 resolution for Chl-a. These are supported storage examples, not claims about retrieval validity.
+
+## OWT product presentation and compression
+
+```ini
+[processing]
+owt_product = turbidity
+# Or: spm
+```
+
+`owt_product = turbidity` presents the existing OWT retrieval as Turbidity in NTU (default); `spm` presents the same values as SPM in mg L-1. This choice changes presentation and unit metadata only. It does not convert values, change the retrieval equations, or alter quality thresholds. The `Turb` folder and report keys remain stable; HySPM always uses mg L-1.
+
+GeoTIFFs use lossless LZW compression and tiling. Compression preserves encoded pixel values and metadata. Floating arrays retain their original dtype. Integer encoding still rounds to the nearest 1 / multiplier: at multiplier 100 its maximum rounding error is 0.005. The uint32 valid maximum at multiplier 100 is 42,949,672.94, avoiding the uint16 ×100 limit of 655.34. Existing uint16 files remain readable using their embedded scale and nodata metadata. When reading older files without scale metadata, explicitly configure their original multiplier.
 
 ## Reports
 
@@ -150,7 +162,7 @@ Optional custom demonstration equations are documented in docs/custom_equations.
 
 ## Troubleshooting
 
-**No inputs found:** confirm that the processor is correct, the configured tile matches the folder name, and GRS scenes are under `inputs/<tile>/`. ACOLITE inputs must be `*_L2W.nc` (if unavailable, `*_L2R.nc`) and contain matching tile metadata.
+**No inputs found:** confirm that the processor is correct, the configured tile matches the folder name, and GRS scenes are under `inputs/<tile>/`. ACOLITE batch inputs must be `*_L2R.nc` and contain matching tile metadata.
 
 **Mask mismatch or ambiguity:** check the mask date, tile, and acquisition timestamp. Remove duplicate candidates or enable static-mask mode with a compatible reference mask.
 

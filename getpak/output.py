@@ -21,7 +21,7 @@ class Raster:
         Given an input ndarray and the desired projection parameters, create a raster.tif using rasterio.
 
     array2tiff_gdal(ndarray_data, str_output_file, transform, projection, no_data=-1, compression='COMPRESS=PACKBITS')
-        Given an input ndarray and the desired projection parameters, create a raster.tif using GDT_Float32.
+        Given an input ndarray and the desired projection parameters, create a losslessly compressed raster.tif preserving the input dtype.
 
     reproj(in_raster, out_raster, target_crs='EPSG:4326')
         Given an input raster.tif reproject it to reprojected.tif using @target_crs
@@ -88,7 +88,7 @@ class Raster:
     def array2tiff(ndarray_data, str_output_file, transform, projection, no_data=-1,
                    compression='LZW', metadata=None):
         """
-        Given an input ndarray and the desired projection parameters, create a raster.tif using GDT_Float32.
+        Given an input ndarray and the desired projection parameters, create a losslessly compressed raster.tif preserving the input dtype.
 
         Parameters
         ----------
@@ -101,11 +101,6 @@ class Raster:
 
         @return: None (If all goes well, array2tiff should pass and generate a file inside @str_output_file)
         """
-        # first, check if the vector is not float64
-
-        if ndarray_data.dtype == 'float64':
-            ndarray_data = ndarray_data.astype('float32')
-
         with rasterio.open(
             fp=str_output_file,
             mode='w',
@@ -117,9 +112,9 @@ class Raster:
             crs=projection,
             transform=transform,
             nodata=no_data,
-            options=[compression],
+            compress=compression.removeprefix('COMPRESS='),
             tiled=True,
-            predictor=2
+            predictor=3 if ndarray_data.dtype.kind == 'f' else 2
         ) as file:
             file.write(ndarray_data, 1)
             if metadata:
@@ -157,7 +152,7 @@ class Raster:
     def array2tiff_gdal(ndarray_data, str_output_file, transform, projection, no_data=-1,
                         compression='COMPRESS=PACKBITS'):
         """
-        Given an input ndarray and the desired projection parameters, create a raster.tif using GDT_Float32.
+        Given an input ndarray and the desired projection parameters, create a losslessly compressed raster.tif preserving the input dtype.
 
         Parameters
         ----------

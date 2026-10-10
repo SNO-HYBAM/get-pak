@@ -574,7 +574,7 @@ class Pipelines:
             'maximum_physical_value': (
                 None if float32_contract else (
                     maximum_physical_value if maximum_physical_value is not None else
-                    (None if categorical else float(65534.0 / stored_multiplier))
+                    (None if categorical else float((np.iinfo(resolved_dtype).max - 1) / stored_multiplier))
                 )
             ),
             'acquisition_datetime_utc': acquired['acquisition_datetime_utc'],
@@ -690,10 +690,13 @@ class Pipelines:
         if self._target_was_skipped(target):
             return target, {'skipped_existing': True}
         nodata = self.encoding_settings['output_encoding']['continuous_nodata']
-        encoded, metadata = u.to_uint16_scaled(
+        encoded, metadata = u.to_uint_scaled(
             values, scale=scale, nodata=nodata, unit=unit,
+            dtype=self.encoding_settings['output_encoding']['continuous_dtype'],
             product=str(prefix).rstrip('_'), return_metadata=True,
         )
+        if str(prefix).rstrip('_') == 'Turb':
+            metadata['owt_product'] = self.encoding_settings['output_encoding']['owt_product']
         metadata.update(self._output_contract_metadata(
             scene_uid, str(prefix).rstrip('_'), unit=unit,
             stored_multiplier=scale, nodata=nodata,
@@ -1225,7 +1228,7 @@ class Pipelines:
                     chla = m.blended_chla(rrs_dict=grs, owt_classes=owt_classes, owt_weights=owt_weights, limits=True)
 
                     # calculating the legacy-named OWT-SPM product
-                    print(f'Calculating OWT-SPM (legacy Turb output)...')
+                    print(f"Calculating OWT-{self.encoding_settings['output_encoding']['owt_product']}...")
                     turb = m.turb(rrs_dict=grs, class_owt_spt=classes_turb, alg='owt', limits=True)
 
                     # calculating SPM_S3
@@ -1334,9 +1337,8 @@ class Pipelines:
                     print('Writing the water-quality rasters...')
                     for product, values, unit in (
                         ('Chla', chla, 'mg m-3'),
-                        # Keep the Turb key/path for backward compatibility; the
-                        # four-OWT Jiang/Zhang/Binding retrieval is SPM mass.
-                        ('Turb', turb, 'mg L-1'),
+                        # Presentation choice leaves the retrieval values unchanged.
+                        ('Turb', turb, self.encoding_settings['output_encoding']['owt_unit']),
                         ('HySPM', hyspm, 'mg L-1'),
                     ):
                         path, scale_metadata = self._write_scaled_raster(
@@ -1771,7 +1773,7 @@ class Pipelines:
 
             unit_notes = {
                 "Chla": "Chl-a statistics use physical units of mg m-3; *_count and *_roi_features are counts; *_status is text.",
-                "Turb": "OWT-SPM statistics use physical units of mg L-1; Turb is the legacy product key/path; *_count and *_roi_features are counts; *_status is text.",
+                "Turb": "OWT statistics use the selected presentation units recorded in Turb_physical_unit; *_count and *_roi_features are counts; *_status is text.",
                 "HySPM": "HySPM statistics use physical units of mg L-1; *_count and *_roi_features are counts; *_status is text.",
             }
             for worksheet in workbook.worksheets:
@@ -2010,7 +2012,9 @@ class Pipelines:
             f"{prefix}_roi_features_with_data": stats.get("roi_features_with_data"),
             f"{prefix}_encoding_version": version,
             f"{prefix}_encoding_profile": tags.get("ENCODING_PROFILE"),
-            f"{prefix}_physical_unit": tags.get("PHYSICAL_UNIT"),
+            f"{prefix}_physical_unit": (u.resolve_encoding_settings(dict(encoding_settings))["output_encoding"]["owt_unit"]
+                                        if prefix == "Turb" and encoding_settings is not None
+                                        else tags.get("PHYSICAL_UNIT")),
             f"{prefix}_applied_multiplier": stored_multiplier,
             f"{prefix}_decode_multiplier": decode_multiplier,
             f"{prefix}_decode_source": decode_source,
@@ -2095,7 +2099,7 @@ class Pipelines:
             _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['HySPM'], roi_vector, prefix='HySPM', encoding_settings=self.settings)) for key in itermediary_batch_dict.keys()]
             print('Done.')
 
-            print('Fetching OWT-SPM L2B data (legacy Turb path)..')
+            print('Fetching OWT L2B data (Turb path)..')
             _ = [itermediary_batch_dict[key].update(self._parse_tifs(itermediary_batch_dict[key]['Turb'], roi_vector, prefix='Turb', encoding_settings=self.settings)) for key in itermediary_batch_dict.keys()]
             print('Done.')
 

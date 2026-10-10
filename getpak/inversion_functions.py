@@ -617,6 +617,10 @@ def spm_zhang2014(RedEdge1, a=362507, b=2.3222):
     spm = a * (RedEdge1 ** b)
     return spm
 
+# Compatibility names for existing notebooks and external callers.
+spm_severo = spm_beni_mamore
+vectorized_spm_sev = vectorized_spm_beni_mamore
+
 functions = {
     'CHL_Gitelson2': {
         'function': chl_gitelson2,

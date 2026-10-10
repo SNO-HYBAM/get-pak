@@ -143,9 +143,9 @@ def _full_encoding_config(**output_overrides):
 def test_encoding_defaults_are_added_when_sections_are_absent():
     settings = Utils.resolve_encoding_settings({"processing": {}})
     assert settings["output_encoding"]["encoding_profile"] == "standard"
-    assert settings["output_encoding"]["turbidity_multiplier"] == 10
+    assert settings["output_encoding"]["turbidity_multiplier"] == 100
     assert "legacy_decoding" not in settings
-    assert settings["output_encoding"]["continuous_dtype"] == "uint16"
+    assert settings["output_encoding"]["continuous_dtype"] == "uint32"
 
 
 def test_legacy_section_is_rejected_instead_of_silently_retained():
@@ -158,8 +158,8 @@ def test_custom_multipliers_expose_resolution_and_maximum():
     output = settings["output_encoding"]
     assert output["encoding_profile"] == "custom"
     assert output["resolution"]["turbidity_multiplier"] == pytest.approx(0.2)
-    assert output["maximum_physical_value"]["turbidity_multiplier"] == pytest.approx(13106.8)
-    assert Utils.encoding_summary(settings)[2]["maximum"] == pytest.approx(13106.8)
+    assert output["maximum_physical_value"]["turbidity_multiplier"] == pytest.approx(858993458.8)
+    assert Utils.encoding_summary(settings)[2]["maximum"] == pytest.approx(858993458.8)
 
 
 @pytest.mark.parametrize(
@@ -169,8 +169,8 @@ def test_custom_multipliers_expose_resolution_and_maximum():
         ("hyspm_multiplier", "-1", "finite positive"),
         ("rrs_multiplier", "nan", "finite positive"),
         ("chla_multiplier", "inf", "finite positive"),
-        ("continuous_dtype", "uint32", "continuous_dtype must be uint16"),
-        ("continuous_nodata", "0", "continuous_nodata must be 65535"),
+        ("continuous_dtype", "uint64", "continuous_dtype must be uint16 or uint32"),
+        ("continuous_nodata", "0", "continuous_nodata must be 4294967295"),
         ("categorical_dtype", "uint16", "categorical_dtype must be uint8"),
         ("categorical_nodata", "0", "categorical_nodata must be 255"),
     ),
@@ -200,7 +200,7 @@ def test_untagged_default_scale_uses_settings_fallback(tmp_path, monkeypatch):
     with rasterio.open(target) as source:
         assert source.scales == pytest.approx((1.0,))
     monkeypatch.setattr("getpak.automation.m.shp_stats", lambda **kwargs: {"min": 1234, "max": 1234, "mean": 1234, "count": 1, "std": 0, "median": 1234})
-    result = Pipelines._parse_tifs(target, "roi.shp", prefix="Turb", encoding_settings=_full_encoding_config())
+    result = Pipelines._parse_tifs(target, "roi.shp", prefix="Turb", encoding_settings=_full_encoding_config(turbidity_multiplier=10))
     assert result["Turb_mean"] == pytest.approx(123.4)
     assert result["Turb_decode_source"] == "settings_fallback"
     assert "settings_fallback multiplier 10" in result["Turb_warning"]
@@ -211,7 +211,7 @@ def test_invalid_embedded_metadata_is_visible(tmp_path):
     with rasterio.open(target, "w", driver="GTiff", height=1, width=1, count=1, dtype="uint16", crs="EPSG:4326", transform=Affine.identity(), nodata=65535) as dst:
         dst.write(np.array([[100]], dtype="uint16"), 1)
         dst.update_tags(GETPAK_ENCODING_VERSION="GETPAK-ENC-2", STORED_MULTIPLIER="10", DECODE_MULTIPLIER="0.2")
-    result = Pipelines._parse_tifs(target, "roi.shp", prefix="Turb", encoding_settings=_full_encoding_config())
+    result = Pipelines._parse_tifs(target, "roi.shp", prefix="Turb", encoding_settings=_full_encoding_config(turbidity_multiplier=10))
     assert result["Turb_status"] == "unreadable raster"
     assert "contradictory decode metadata" in result["Turb_error"]
 
@@ -324,7 +324,7 @@ def test_current_version_and_zero_offset_without_factor_use_settings_fallback(tm
                                            "count": 1, "std": 0, "median": 100})
     result = Pipelines._parse_tifs(
         target, "roi.shp", prefix="Turb",
-        encoding_settings=_full_encoding_config())
+        encoding_settings=_full_encoding_config(turbidity_multiplier=10))
     assert result["Turb_mean"] == pytest.approx(10.0)
     assert result["Turb_decode_source"] == "settings_fallback"
     assert result["Turb_applied_multiplier"] == pytest.approx(10)
@@ -340,7 +340,7 @@ def test_invalid_factor_and_nonzero_offset_are_errors(tmp_path):
         dst.update_tags(GETPAK_ENCODING_VERSION="GETPAK-ENC-2",
                         STORED_MULTIPLIER="not-a-number")
     parsed = Pipelines._parse_tifs(invalid, "roi.shp", prefix="Turb",
-                                   encoding_settings=_full_encoding_config())
+                                   encoding_settings=_full_encoding_config(turbidity_multiplier=10))
     assert parsed["Turb_status"] == "unreadable raster"
     assert "invalid STORED_MULTIPLIER" in parsed["Turb_error"]
 
@@ -351,7 +351,7 @@ def test_invalid_factor_and_nonzero_offset_are_errors(tmp_path):
         dst.write(np.array([[100]], dtype="uint16"), 1)
         dst.update_tags(ADD_OFFSET="1")
     parsed = Pipelines._parse_tifs(offset, "roi.shp", prefix="Turb",
-                                   encoding_settings=_full_encoding_config())
+                                   encoding_settings=_full_encoding_config(turbidity_multiplier=10))
     assert parsed["Turb_status"] == "unreadable raster"
     assert "nonzero or invalid ADD_OFFSET" in parsed["Turb_error"]
 
@@ -365,7 +365,7 @@ def test_explicit_tiff_scale_and_offset_conflicts_are_visible(tmp_path):
         dst.scales = (0.1,)
         dst.update_tags(RASTER_SCALE="0.2")
     parsed = Pipelines._parse_tifs(scale_target, "roi.shp", prefix="Turb",
-                                   encoding_settings=_full_encoding_config())
+                                   encoding_settings=_full_encoding_config(turbidity_multiplier=10))
     assert parsed["Turb_status"] == "unreadable raster"
     assert "conflicting explicit raster scale metadata" in parsed["Turb_error"]
 
@@ -377,6 +377,6 @@ def test_explicit_tiff_scale_and_offset_conflicts_are_visible(tmp_path):
         dst.offsets = (1.0,)
         dst.update_tags(ADD_OFFSET="0")
     parsed = Pipelines._parse_tifs(offset_target, "roi.shp", prefix="Turb",
-                                   encoding_settings=_full_encoding_config())
+                                   encoding_settings=_full_encoding_config(turbidity_multiplier=10))
     assert parsed["Turb_status"] == "unreadable raster"
     assert "conflicting explicit offset metadata" in parsed["Turb_error"]

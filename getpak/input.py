@@ -489,7 +489,7 @@ class ACOLITE_S2:
     """
 
     _FILENAME_RE = re.compile(
-        r"^(S2[AB])_MSI_(\d{4})_(\d{2})_(\d{2})_(\d{2})_(\d{2})_(\d{2})_"
+        r"^(S2[ABC])_MSI_(\d{4})_(\d{2})_(\d{2})_(\d{2})_(\d{2})_(\d{2})_"
         r"(T?[0-9A-Z]{5})_(L2[RW])\.nc$"
     )
 
@@ -504,7 +504,7 @@ class ACOLITE_S2:
         if match is None:
             raise ValueError(
                 "ACOLITE metadata are incomplete and the filename does not match "
-                "S2[AB]_MSI_YYYY_MM_DD_hh_mm_ss_T<tile>_L2R.nc."
+                "S2[ABC]_MSI_YYYY_MM_DD_hh_mm_ss_T<tile>_L2R.nc."
             )
         mission, year, month, day, hour, minute, second, tile, product = match.groups()
         acquired = datetime.strptime(
@@ -553,7 +553,7 @@ class ACOLITE_S2:
         fallback = None
         sensor = str(attrs.get("sensor", "")).strip().upper()
         if sensor:
-            if sensor not in {"S2A_MSI", "S2B_MSI"}:
+            if sensor not in {"S2A_MSI", "S2B_MSI", "S2C_MSI"}:
                 raise ValueError(f"Unsupported ACOLITE sensor {sensor!r} in {path}.")
             mission = sensor.split("_")[0]
         else:
@@ -698,7 +698,7 @@ class ACOLITE_S2:
                                    "conversion": "Rrs = rhos / pi"})
                 subset_dict[new_name] = band
         elif meta['prod_type'] == 'L2W':
-            b_try = "Rrs_" + bands[0]
+            b_try = "Rrs_" + bands['Aerosol']
             if b_try in ds.variables:
                 adjbands = {key: f"Rrs_{value}" for key, value in bands.items()}
                 subset_dict = {new_name: ds[var_name] for new_name, var_name in adjbands.items()}
