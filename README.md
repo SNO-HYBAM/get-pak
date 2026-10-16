@@ -179,3 +179,11 @@ The current release uses methods described in:
 - Harmel, T., Chami, M., Tormos, T., Reynaud, N., Danis, P.-A., 2018. Sunglint correction of MSI-Sentinel-2 imagery over inland and sea waters. *Remote Sensing of Environment* 204, 308–321. [doi:10.1016/j.rse.2017.10.022](https://doi.org/10.1016/j.rse.2017.10.022)
 - Tavares, M.H., Guimarães, D., Roussillon, J., Baute, V., Cucherousset, J., Boulêtreau, S., Martinez, J.-M., 2025. A framework to retrieve water-quality parameters in small, optically diverse freshwater ecosystems using Sentinel-2 MSI imagery. *Remote Sensing* 17, 2729. [doi:10.3390/rs17152729](https://doi.org/10.3390/rs17152729)
 - Cordeiro, M.C.R., Martinez, J.-M., Peña-Luque, S., 2021. Automatic water detection from multidimensional hierarchical clustering for Sentinel-2 images. *Remote Sensing of Environment* 253, 112209.
+
+## Bundled examples (1.0.3)
+
+Open `examples/Notebook_single_image_tutorial.ipynb` for the detailed single-scene steps or `examples/l2b_workflow.ipynb` for the workflow comparison. Run all cells from the repository root or `examples/`, using a Python environment with GET-Pak and Matplotlib installed. Both notebooks use the bundled GRS v2.1.9 scene (31TCJ, 7 September 2023) and WaterDetect mask.
+
+`examples/example_settings.ini` contains paths relative to `examples/`; `example_support.py` resolves them, copies the input into the batch tile-folder layout, and creates an isolated output directory per run under `examples/Outputs/`. The shared helper uses the current pipeline writers, while filtering and retrieval steps remain visible in the notebooks. The final cells run the actual batch pipeline and assert equality of valid masks, decoded values, georeferencing, and encoding metadata for all 13 raster products. No ROI vectors are bundled, so ROI reporting is disabled.
+
+For direct CLI processing, adapt the settings to absolute paths and the documented `inputs/<tile>/` layout. See [1.0.3 migration notes](CHANGELOG.md) before reusing older encoding settings.
