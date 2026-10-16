@@ -110,9 +110,9 @@ New rasters use encoding version `GETPAK-ENC-2`. Continuous products default to 
 
 | Product | Stored multiplier | Decode physical value | No-data | Unit |
 | --- | ---: | ---: | ---: | --- |
-| Rrs bands | 10,000 | stored value × 0.0001 | 4,294,967,295 | sr-1 |
-| Chlorophyll-a | 100 | stored value × 0.01 | 4,294,967,295 | mg m-3 |
-| Turb (OWT product) | 100 | stored value × 0.01 | 4,294,967,295 | NTU or mg L-1, selected in settings |
+| Rrs bands | 10,000 | stored value × 0.0001 | 2,147,483,648 | sr-1 |
+| Chlorophyll-a | 100 | stored value × 0.01 | 2,147,483,648 | mg m-3 |
+| Turb (OWT product) | 100 | stored value × 0.01 | 2,147,483,648 | NTU |
 | HySPM | 100 | stored value × 0.01 | 4,294,967,295 | mg L-1 |
 | OWT and OWTSPM | 1 | stored class code | 255 | class code |
 
