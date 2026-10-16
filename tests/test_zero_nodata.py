@@ -96,3 +96,30 @@ def test_file_metadata_does_not_validate_obsolete_output_settings(tmp_path):
     assert result['Turb_mean'] == 5
     assert result['Turb_decode_source'] == 'embedded_metadata'
     assert result['Turb_physical_unit'] == 'legacy-unit'
+
+
+def test_default_rrs_preserves_dark_water_values_and_legacy_scale(tmp_path):
+    settings = Utils.resolve_encoding_settings({})
+    scale = settings['output_encoding']['rrs_multiplier']
+    assert scale == 10000000
+    values = np.array([[0, 0.00000004, 0.0000003, 0.0000012]])
+    encoded, metadata = Utils.to_uint_scaled(values, scale=scale, product='Red',
+                                             return_metadata=True)
+    assert encoded.tolist() == [[0, 0, 3, 12]]
+    target = tmp_path / 'dark_water.tif'
+    Raster.array2tiff(encoded, target, Affine(1, 0, 0, 0, -1, 1),
+                      'EPSG:4326', metadata=metadata)
+    with rasterio.open(target) as src:
+        assert src.scales[0] == pytest.approx(1e-7)
+        assert src.read_masks(1).tolist() == [[0, 0, 255, 255]]
+        assert src.read(1)[0, 2] * src.scales[0] == pytest.approx(3e-7)
+    legacy = tmp_path / 'legacy_rrs.tif'
+    with rasterio.open(legacy, 'w', driver='GTiff', width=1, height=1, count=1,
+                       dtype='uint16', transform=Affine(1, 0, 0, 0, -1, 1),
+                       crs='EPSG:4326', nodata=65535) as dst:
+        dst.write(np.array([[3]], dtype='uint16'), 1)
+        dst.scales = (.0001,)
+    result = Pipelines._parse_tifs(legacy, [mapping(box(0, 0, 1, 1))],
+                                  prefix='Red', encoding_settings=settings)
+    assert result['Red_mean'] == pytest.approx(.0003)
+    assert result['Red_decode_source'] == 'embedded_metadata'

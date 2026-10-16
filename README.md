@@ -110,13 +110,15 @@ New rasters use encoding version `GETPAK-ENC-2`. Continuous products default to 
 
 | Product | Stored multiplier | Decode physical value | No-data | Unit |
 | --- | ---: | ---: | ---: | --- |
-| Rrs bands | 10,000 | stored value × 0.0001 | 0 | sr-1 |
+| Rrs bands | 10,000,000 | stored value × 0.0000001 | 0 | sr-1 |
 | Chlorophyll-a | 100 | stored value × 0.01 | 0 | mg m-3 |
 | Turb (OWT product) | 100 | stored value × 0.01 | 0 | NTU |
 | HySPM | 100 | stored value × 0.01 | 0 | mg L-1 |
 | OWT and OWTSPM | 1 | stored class code | 0 | class code |
 
 The GeoTIFF stores its actual multiplier, zero offset, unit, no-data, product, encoding version/profile, valid range, overflow count, source acquisition time, tile, provenance identity, and source product name. A raw array reader must decode exactly once using the embedded metadata. If authoritative multiplier metadata is absent, GET-Pak uses the product multiplier from the same [output_encoding] dictionary and records that settings_fallback was used. Rasterio's generic default scale of 1.0 is not treated as explicit metadata. Invalid or contradictory embedded encoding metadata, including a nonzero offset, is an error. Do not apply continuous scaling to OWT classes. Values that are non-finite, invalid under the existing quality rules, or outside the representable physical range become no-data and are counted in the metadata.
+
+The default Rrs multiplier of 10,000,000 preserves 0.0000003 sr-1 as stored code 3. Its resolution is 0.0000001 sr-1, with a uint32 maximum of 429.4967295 sr-1. Values rounding to zero remain NoData; the exact half-step rounds to even (zero). This storage precision does not imply measurement accuracy. With uint16, the same multiplier limits Rrs to 0.0065535 sr-1, so use uint32 for the standard profile. Older files retain their embedded multiplier; untagged older Rrs files require their original multiplier as an explicit fallback.
 
 The storage range protects against integer wraparound; it does not establish scientific validity of a retrieval at the highest concentration that can be stored.
 
@@ -127,7 +129,7 @@ The optional [output_encoding] section is the only encoding configuration. When 
 ```ini
 [output_encoding]
 encoding_version = GETPAK-ENC-2
-rrs_multiplier = 10000
+rrs_multiplier = 10000000
 chla_multiplier = 100
 turbidity_multiplier = 100
 hyspm_multiplier = 100

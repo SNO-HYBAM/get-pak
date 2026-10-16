@@ -29,7 +29,7 @@ class Utils:
 
     OUTPUT_ENCODING_DEFAULTS = {
         'encoding_version': 'GETPAK-ENC-2',
-        'rrs_multiplier': 10000.0,
+        'rrs_multiplier': 10000000.0,
         'chla_multiplier': 100.0,
         'turbidity_multiplier': 100.0,
         'hyspm_multiplier': 100.0,
