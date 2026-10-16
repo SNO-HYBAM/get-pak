@@ -11,11 +11,11 @@ def test_uint32_retains_high_concentrations_and_zero(tmp_path):
     encoded, tags = Utils.to_uint_scaled(values, scale=100, return_metadata=True)
     target = tmp_path / 'high_spm.tif'
     Raster.array2tiff(encoded, target, Affine(20, 0, 300000, 0, -20, 9100000),
-                      'EPSG:32720', no_data=4294967295, metadata=tags)
+                      'EPSG:32720', no_data=0, metadata=tags)
     with rasterio.open(target) as src:
         assert src.compression.value == 'LZW'
         assert src.dtypes == ('uint32',)
-        assert src.nodata == 4294967295
+        assert src.nodata == 0
         assert np.array_equal(src.read(1), encoded)
         assert np.array_equal(src.read(1)[0, :6], np.rint(values[0, :6] * 100))
         assert np.allclose(src.read(1)[0, :6] * src.scales[0], values[0, :6])
@@ -26,10 +26,10 @@ def test_uint32_retains_high_concentrations_and_zero(tmp_path):
 @pytest.mark.parametrize('dtype', ['uint16', 'uint32'])
 def test_encoding_boundary_has_no_integer_wraparound(dtype):
     nodata = int(np.iinfo(dtype).max)
-    maximum = (nodata - 1) / 100
+    maximum = nodata / 100
     data, tags = Utils.to_uint_scaled(np.array([maximum, maximum + 1, 1.23456]),
                                      dtype=dtype, scale=100, return_metadata=True)
-    assert data.tolist() == [nodata - 1, nodata, 123]
+    assert data.tolist() == [nodata, 0, 123]
     assert tags['overflow_count'] == 1
     assert abs(data[-1] / 100 - 1.23456) <= 0.005
 
@@ -59,9 +59,9 @@ def test_presentation_switch_does_not_change_encoding():
         Utils.resolve_encoding_settings({'processing': {'owt_product': 'invalid'}})
 
 
-def test_legacy_uint16_settings_remain_supported():
+def test_uint16_zero_settings_are_supported():
     output = Utils.resolve_encoding_settings({'output_encoding': {
-        'continuous_dtype': 'uint16', 'continuous_nodata': 65535,
+        'continuous_dtype': 'uint16', 'continuous_nodata': 0,
         'hyspm_multiplier': 10, 'turbidity_multiplier': 10,
     }})['output_encoding']
-    assert output['maximum_physical_value']['hyspm_multiplier'] == 6553.4
+    assert output['maximum_physical_value']['hyspm_multiplier'] == 6553.5

@@ -106,38 +106,40 @@ Each run also writes a scene ledger named `<run>_scene_ledger.json`, a timing ma
 
 ## Raster values and no-data
 
-New rasters use encoding version `GETPAK-ENC-2`. Continuous products default to unsigned 32-bit rasters with `4294967295` as no-data; zero is a valid physical value. Categorical OWT products are unsigned 8-bit rasters with `255` as no-data; class zero is preserved when it is a valid class.
+New rasters use encoding version `GETPAK-ENC-2`. Continuous products default to unsigned 32-bit rasters with `0` as no-data. Physical zero and positive values rounding to stored zero become no-data (excluded from ROI counts and statistics). Categorical OWT products are unsigned 8-bit rasters with `0` as no-data; valid class codes are 1–255.
 
 | Product | Stored multiplier | Decode physical value | No-data | Unit |
 | --- | ---: | ---: | ---: | --- |
-| Rrs bands | 10,000 | stored value × 0.0001 | 2,147,483,648 | sr-1 |
-| Chlorophyll-a | 100 | stored value × 0.01 | 2,147,483,648 | mg m-3 |
-| Turb (OWT product) | 100 | stored value × 0.01 | 2,147,483,648 | NTU |
-| HySPM | 100 | stored value × 0.01 | 4,294,967,295 | mg L-1 |
-| OWT and OWTSPM | 1 | stored class code | 255 | class code |
+| Rrs bands | 10,000,000 | stored value × 0.0000001 | 0 | sr-1 |
+| Chlorophyll-a | 100 | stored value × 0.01 | 0 | mg m-3 |
+| Turb (OWT product) | 100 | stored value × 0.01 | 0 | NTU |
+| HySPM | 100 | stored value × 0.01 | 0 | mg L-1 |
+| OWT and OWTSPM | 1 | stored class code | 0 | class code |
 
 The GeoTIFF stores its actual multiplier, zero offset, unit, no-data, product, encoding version/profile, valid range, overflow count, source acquisition time, tile, provenance identity, and source product name. A raw array reader must decode exactly once using the embedded metadata. If authoritative multiplier metadata is absent, GET-Pak uses the product multiplier from the same [output_encoding] dictionary and records that settings_fallback was used. Rasterio's generic default scale of 1.0 is not treated as explicit metadata. Invalid or contradictory embedded encoding metadata, including a nonzero offset, is an error. Do not apply continuous scaling to OWT classes. Values that are non-finite, invalid under the existing quality rules, or outside the representable physical range become no-data and are counted in the metadata.
+
+The default Rrs multiplier of 10,000,000 preserves 0.0000003 sr-1 as stored code 3. Its resolution is 0.0000001 sr-1, with a uint32 maximum of 429.4967295 sr-1. Values rounding to zero remain NoData; the exact half-step rounds to even (zero). This storage precision does not imply measurement accuracy. With uint16, the same multiplier limits Rrs to 0.0065535 sr-1, so use uint32 for the standard profile. Older files retain their embedded multiplier; untagged older Rrs files require their original multiplier as an explicit fallback.
 
 The storage range protects against integer wraparound; it does not establish scientific validity of a retrieval at the highest concentration that can be stored.
 
 ## Encoding settings
 
-The optional [output_encoding] section is the only encoding configuration. When it is absent, the standard values below are used. Supplied multipliers must be finite and positive; continuous storage supports uint16 with 65535 no-data or uint32 with 4294967295 no-data, and categorical storage remains uint8 with 255 no-data.
+The optional [output_encoding] section is the only encoding configuration. When it is absent, the standard values below are used. Supplied multipliers must be finite and positive; continuous storage supports uint16 or uint32 with zero no-data, and categorical storage uses uint8 with zero no-data. Nonzero NoData settings must be migrated to zero for new outputs.
 
 ```ini
 [output_encoding]
 encoding_version = GETPAK-ENC-2
-rrs_multiplier = 10000
+rrs_multiplier = 10000000
 chla_multiplier = 100
 turbidity_multiplier = 100
 hyspm_multiplier = 100
 continuous_dtype = uint32
-continuous_nodata = 4294967295
+continuous_nodata = 0
 categorical_dtype = uint8
-categorical_nodata = 255
+categorical_nodata = 0
 ```
 
-The effective profile, physical resolution (1 / multiplier), and maximum ((dtype maximum - 1) / multiplier) are shown when settings are read. Standard multipliers use profile standard; changed multipliers use profile custom under the same GETPAK-ENC-2 schema. For example, multiplier 5 supports 7000 mg L-1 at 0.2 mg L-1 resolution for HySPM, and multiplier 50 supports 1000 mg m-3 at 0.02 mg m-3 resolution for Chl-a. These are supported storage examples, not claims about retrieval validity.
+The effective profile, physical resolution (1 / multiplier), and maximum (dtype maximum / multiplier) are shown when settings are read. Standard multipliers use profile standard; changed multipliers use profile custom under the same GETPAK-ENC-2 schema. For example, multiplier 5 supports 7000 mg L-1 at 0.2 mg L-1 resolution for HySPM, and multiplier 50 supports 1000 mg m-3 at 0.02 mg m-3 resolution for Chl-a. These are supported storage examples, not claims about retrieval validity.
 
 ## OWT product presentation and compression
 
@@ -149,7 +151,7 @@ owt_product = turbidity
 
 `owt_product = turbidity` presents the existing OWT retrieval as Turbidity in NTU (default); `spm` presents the same values as SPM in mg L-1. This choice changes presentation and unit metadata only. It does not convert values, change the retrieval equations, or alter quality thresholds. The `Turb` folder and report keys remain stable; HySPM always uses mg L-1.
 
-GeoTIFFs use lossless LZW compression and tiling. Compression preserves encoded pixel values and metadata. Floating arrays retain their original dtype. Integer encoding still rounds to the nearest 1 / multiplier: at multiplier 100 its maximum rounding error is 0.005. The uint32 valid maximum at multiplier 100 is 42,949,672.94, avoiding the uint16 ×100 limit of 655.34. Existing uint16 files remain readable using their embedded scale and nodata metadata. When reading older files without scale metadata, explicitly configure their original multiplier.
+GeoTIFFs use lossless LZW compression and tiling. Compression preserves encoded pixel values and metadata. Floating arrays retain their original dtype. Integer encoding still rounds to the nearest 1 / multiplier: at multiplier 100 its maximum rounding error is 0.005. The uint32 valid maximum at multiplier 100 is 42,949,672.95, avoiding the uint16 ×100 limit of 655.35. Existing uint16/uint32 files remain readable using their embedded scale and NoData metadata, including maximum-integer sentinels and valid zero pixels. Embedded metadata takes precedence over settings.ini; contradictory metadata is an error. When reading older files without scale metadata, explicitly configure their original multiplier. Files without embedded NoData are rejected because their invalid pixels cannot be inferred safely. The encoding version remains GETPAK-ENC-2: inspect each file’s NoData, not the version alone. Signed custom Float32 products retain NaN NoData and valid physical zero.
 
 ## Reports
 
@@ -177,3 +179,11 @@ The current release uses methods described in:
 - Harmel, T., Chami, M., Tormos, T., Reynaud, N., Danis, P.-A., 2018. Sunglint correction of MSI-Sentinel-2 imagery over inland and sea waters. *Remote Sensing of Environment* 204, 308–321. [doi:10.1016/j.rse.2017.10.022](https://doi.org/10.1016/j.rse.2017.10.022)
 - Tavares, M.H., Guimarães, D., Roussillon, J., Baute, V., Cucherousset, J., Boulêtreau, S., Martinez, J.-M., 2025. A framework to retrieve water-quality parameters in small, optically diverse freshwater ecosystems using Sentinel-2 MSI imagery. *Remote Sensing* 17, 2729. [doi:10.3390/rs17152729](https://doi.org/10.3390/rs17152729)
 - Cordeiro, M.C.R., Martinez, J.-M., Peña-Luque, S., 2021. Automatic water detection from multidimensional hierarchical clustering for Sentinel-2 images. *Remote Sensing of Environment* 253, 112209.
+
+## Bundled examples (1.0.3)
+
+Open `examples/Notebook_single_image_tutorial.ipynb` for the detailed single-scene steps or `examples/l2b_workflow.ipynb` for the workflow comparison. Run all cells from the repository root or `examples/`, using a Python environment with GET-Pak and Matplotlib installed. Both notebooks use the bundled GRS v2.1.9 scene (31TCJ, 7 September 2023) and WaterDetect mask.
+
+`examples/example_settings.ini` contains paths relative to `examples/`; `example_support.py` resolves them, copies the input into the batch tile-folder layout, and creates an isolated output directory per run under `examples/Outputs/`. The shared helper uses the current pipeline writers, while filtering and retrieval steps remain visible in the notebooks. The final cells run the actual batch pipeline and assert equality of valid masks, decoded values, georeferencing, and encoding metadata for all 13 raster products. No ROI vectors are bundled, so ROI reporting is disabled.
+
+For direct CLI processing, adapt the settings to absolute paths and the documented `inputs/<tile>/` layout. See [1.0.3 migration notes](CHANGELOG.md) before reusing older encoding settings.

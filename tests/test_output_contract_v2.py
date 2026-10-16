@@ -16,7 +16,7 @@ def test_continuous_product_multipliers_and_overflow_policy():
     for scale, value in ((10000, 0.1234), (100, 12.34), (10, 3000.0)):
         encoded, metadata = Utils.to_uint16_scaled(
             np.array([0.0, value, 65534 / scale, 65535 / scale, np.nan, -1.0]),
-            scale=scale, return_metadata=True, unit='u', product='p',
+            scale=scale, nodata=65535, return_metadata=True, unit='u', product='p',
         )
         assert encoded[0] == 0
         assert encoded[1] == round(value * scale)
@@ -29,19 +29,19 @@ def test_continuous_product_multipliers_and_overflow_policy():
         assert metadata['finite_physical_min'] == -1.0
 
 
-def test_categorical_class_zero_is_valid_and_255_is_nodata():
+def test_categorical_zero_is_nodata_and_255_is_valid():
     encoded, metadata = Utils.to_uint8_categorical(
         np.array([0, 7, np.nan, 255, -1]), return_metadata=True
     )
-    assert encoded.tolist() == [0, 7, 255, 255, 255]
-    assert metadata['nodata'] == 255
+    assert encoded.tolist() == [0, 7, 0, 255, 0]
+    assert metadata['nodata'] == 0
     assert metadata['encoding_version'] == 'GETPAK-ENC-2'
 
 
 def test_geotiff_contract_tags_and_standard_fields(tmp_path):
     output = tmp_path / 'product.tif'
     encoded, metadata = Utils.to_uint16_scaled(
-        np.array([[0.0, 3000.0]]), scale=10, unit='mg L-1',
+        np.array([[0.0, 3000.0]]), scale=10, nodata=65535, unit='mg L-1',
         product='HySPM', return_metadata=True
     )
     metadata.update({
@@ -158,8 +158,8 @@ def test_custom_multipliers_expose_resolution_and_maximum():
     output = settings["output_encoding"]
     assert output["encoding_profile"] == "custom"
     assert output["resolution"]["turbidity_multiplier"] == pytest.approx(0.2)
-    assert output["maximum_physical_value"]["turbidity_multiplier"] == pytest.approx(858993458.8)
-    assert Utils.encoding_summary(settings)[2]["maximum"] == pytest.approx(858993458.8)
+    assert output["maximum_physical_value"]["turbidity_multiplier"] == pytest.approx(858993459.0)
+    assert Utils.encoding_summary(settings)[2]["maximum"] == pytest.approx(858993459.0)
 
 
 @pytest.mark.parametrize(
@@ -170,9 +170,9 @@ def test_custom_multipliers_expose_resolution_and_maximum():
         ("rrs_multiplier", "nan", "finite positive"),
         ("chla_multiplier", "inf", "finite positive"),
         ("continuous_dtype", "uint64", "continuous_dtype must be uint16 or uint32"),
-        ("continuous_nodata", "0", "continuous_nodata must be 4294967295"),
+        ("continuous_nodata", "4294967295", "continuous_nodata must be 0"),
         ("categorical_dtype", "uint16", "categorical_dtype must be uint8"),
-        ("categorical_nodata", "0", "categorical_nodata must be 255"),
+        ("categorical_nodata", "255", "categorical_nodata must be 0"),
     ),
 )
 def test_invalid_encoding_settings_are_rejected(key, value, message):
