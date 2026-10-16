@@ -34,9 +34,9 @@ class Utils:
         'turbidity_multiplier': 100.0,
         'hyspm_multiplier': 100.0,
         'continuous_dtype': 'uint32',
-        'continuous_nodata': 4294967295,
+        'continuous_nodata': 0,
         'categorical_dtype': 'uint8',
-        'categorical_nodata': 255,
+        'categorical_nodata': 0,
     }
     PRODUCT_FAMILY_KEYS = {
         'aerosol': 'rrs_multiplier', 'blue': 'rrs_multiplier',
@@ -106,7 +106,7 @@ class Utils:
         output = settings['output_encoding']
         print('Effective output encoding: '
               f"{output['encoding_version']} ({output['encoding_profile']}); "
-              f"continuous {output['continuous_dtype']}/{output['continuous_nodata']}, categorical uint8/255.")
+              f"continuous {output['continuous_dtype']}/{output['continuous_nodata']}, categorical uint8/0.")
         for item in Utils.encoding_summary(settings):
             print(
                 f"  {item['product']}: multiplier={item['multiplier']:g}, "
@@ -181,9 +181,9 @@ class Utils:
             )
         continuous_max = int(np.iinfo(output['continuous_dtype']).max)
         if 'continuous_nodata' not in output_raw:
-            output['continuous_nodata'] = continuous_max
+            output['continuous_nodata'] = 0
         output['continuous_nodata'] = Utils._parse_exact_integer(
-            'output_encoding', 'continuous_nodata', output['continuous_nodata'], continuous_max
+            'output_encoding', 'continuous_nodata', output['continuous_nodata'], 0
         )
         presentation = str(config.get('processing', {}).get('owt_product', 'turbidity')).strip().lower()
         if presentation not in {'turbidity', 'spm'}:
@@ -191,7 +191,7 @@ class Utils:
         output['owt_product'] = presentation
         output['owt_unit'] = 'NTU' if presentation == 'turbidity' else 'mg L-1'
         output['categorical_nodata'] = Utils._parse_exact_integer(
-            'output_encoding', 'categorical_nodata', output['categorical_nodata'], 255
+            'output_encoding', 'categorical_nodata', output['categorical_nodata'], 0
         )
 
         standard = Utils.OUTPUT_ENCODING_DEFAULTS
@@ -206,7 +206,7 @@ class Utils:
                         'turbidity_multiplier', 'hyspm_multiplier')
         }
         output['maximum_physical_value'] = {
-            key: (continuous_max - 1) / output[key]
+            key: continuous_max / output[key]
             for key in ('rrs_multiplier', 'chla_multiplier',
                         'turbidity_multiplier', 'hyspm_multiplier')
         }
@@ -275,16 +275,16 @@ class Utils:
         return str_GDAL_DRIVER_PATH
 
     @staticmethod
-    def to_uint16_scaled(arr, scale=10000, nodata=65535, unit='1',
+    def to_uint16_scaled(arr, scale=10000, nodata=0, unit='1',
                          product='unknown', return_metadata=False):
-        """Compatibility wrapper for the original uint16 encoding."""
+        """UInt16 wrapper; explicit maximum-code NoData remains available for legacy writers."""
         return Utils.to_uint_scaled(arr, scale=scale, nodata=nodata, unit=unit,
                                     product=product, return_metadata=return_metadata, dtype='uint16')
 
     @staticmethod
     def to_uint_scaled(arr, scale=10000, nodata=None, unit='1',
                        product='unknown', return_metadata=False, dtype='uint32'):
-        """Encode uint16/uint32 values; reserve the highest code for nodata."""
+        """Encode uint16/uint32 values with zero NoData by default."""
         try:
             scale = float(scale)
         except (TypeError, ValueError) as exc:
@@ -296,15 +296,15 @@ class Utils:
             raise ValueError('Scaled products require uint16 or uint32.')
         dtype_max = int(np.iinfo(dtype).max)
         if nodata is None:
-            nodata = dtype_max
-        if int(nodata) != dtype_max:
-            raise ValueError(f'{dtype.name} scaled products reserve nodata={dtype_max} exclusively.')
+            nodata = 0
+        if nodata not in (0, dtype_max):
+            raise ValueError(f'{dtype.name} scaled products require nodata=0 or legacy {dtype_max}.')
 
         values = np.asarray(arr, dtype=float)
         finite = np.isfinite(values)
         negative = finite & (values < 0)
         valid = finite & ~negative
-        max_code = dtype_max - 1
+        max_code = dtype_max - 1 if nodata == dtype_max else dtype_max
         physical_max = max_code / float(scale)
         finite_values = values[finite]
         physical_min = float(np.min(finite_values)) if finite_values.size else None
@@ -313,7 +313,8 @@ class Utils:
         rounded = np.rint(np.where(valid, values * scale, 0.0))
 
         encoded = np.full(values.shape, nodata, dtype=dtype)
-        encodable = valid & ~overflow
+        zero_code = valid & ~overflow & (rounded == 0) & (nodata == 0)
+        encodable = valid & ~overflow & ~zero_code
         encoded[encodable] = rounded[encodable].astype(dtype)
         metadata = {
             'product': str(product),
@@ -323,9 +324,9 @@ class Utils:
             'add_offset': 0.0,
             'nodata': int(nodata),
             'encoding_version': 'GETPAK-ENC-2',
-            'valid_min': 0.0,
+            'valid_min': float(1.0 / scale) if nodata == 0 else 0.0,
             'valid_max': float(physical_max),
-            'invalid_policy': 'non-finite and negative values map to nodata',
+            'invalid_policy': 'non-finite, negative, and reserved zero codes map to nodata',
             'overflow_policy': 'finite physical overflow maps to nodata',
             'resolution': float(1.0 / scale),
             'maximum_physical_value': float(physical_max),
@@ -334,7 +335,8 @@ class Utils:
             'invalid_count': int((~finite).sum()),
             'negative_count': int(negative.sum()),
             'overflow_count': int(overflow.sum()),
-            'valid_zero_count': int((valid & (values == 0)).sum()),
+            'valid_zero_count': int((encodable & (values == 0)).sum()),
+            'zero_nodata_count': int(zero_code.sum()),
             'finite_physical_min': physical_min,
             'finite_physical_max': physical_max_observed,
         }
@@ -378,13 +380,13 @@ class Utils:
         return (encoded, metadata) if return_metadata else encoded
 
     @staticmethod
-    def to_uint8_categorical(arr, nodata=255, product='OWT', unit='class',
+    def to_uint8_categorical(arr, nodata=0, product='OWT', unit='class',
                              class_description=None, return_metadata=False):
-        """Encode categorical classes without treating class zero as no-data."""
-        if int(nodata) != 255:
-            raise ValueError('UInt8 categorical products reserve nodata=255.')
+        """Encode categorical classes 1..255, reserving zero for NoData."""
+        if nodata != 0:
+            raise ValueError('UInt8 categorical products reserve nodata=0.')
         values = np.asarray(arr, dtype=float)
-        valid = np.isfinite(values) & (values >= 0) & (values <= 254)
+        valid = np.isfinite(values) & (values >= 1) & (values <= 255)
         valid &= values == np.rint(values)
         encoded = np.full(values.shape, nodata, dtype=np.uint8)
         encoded[valid] = values[valid].astype(np.uint8)
@@ -398,11 +400,11 @@ class Utils:
             'nodata': int(nodata),
             'encoding_version': 'GETPAK-ENC-2',
             'class_codes': ','.join(str(value) for value in classes),
-            'class_description': class_description or 'Class codes are preserved as stored; 255 is no-data.',
+            'class_description': class_description or 'Class codes 1..255 are preserved as stored; 0 is no-data.',
             'invalid_policy': 'invalid, non-finite, or out-of-range classes map to nodata',
             'overflow_policy': 'out-of-range classes map to nodata',
             'invalid_count': int((~valid).sum()),
-            'overflow_count': int((np.isfinite(values) & ((values < 0) | (values > 254))).sum()),
+            'overflow_count': int((np.isfinite(values) & ((values < 0) | (values > 255))).sum()),
         }
         return (encoded, metadata) if return_metadata else encoded
 

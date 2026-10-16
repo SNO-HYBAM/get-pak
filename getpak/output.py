@@ -17,10 +17,10 @@ class Raster:
 
     Methods
     -------
-    array2tiff(ndarray_data, str_output_file, transform, projection, no_data=-1, compression='COMPRESS=PACKBITS')
+    array2tiff(ndarray_data, str_output_file, transform, projection, no_data=0, compression='COMPRESS=PACKBITS')
         Given an input ndarray and the desired projection parameters, create a raster.tif using rasterio.
 
-    array2tiff_gdal(ndarray_data, str_output_file, transform, projection, no_data=-1, compression='COMPRESS=PACKBITS')
+    array2tiff_gdal(ndarray_data, str_output_file, transform, projection, no_data=0, compression='COMPRESS=PACKBITS')
         Given an input ndarray and the desired projection parameters, create a losslessly compressed raster.tif preserving the input dtype.
 
     reproj(in_raster, out_raster, target_crs='EPSG:4326')
@@ -85,7 +85,7 @@ class Raster:
         pass
 
     @staticmethod
-    def array2tiff(ndarray_data, str_output_file, transform, projection, no_data=-1,
+    def array2tiff(ndarray_data, str_output_file, transform, projection, no_data=0,
                    compression='LZW', metadata=None):
         """
         Given an input ndarray and the desired projection parameters, create a losslessly compressed raster.tif preserving the input dtype.
@@ -149,7 +149,7 @@ class Raster:
                     file.units = (str(unit),)
 
     @staticmethod
-    def array2tiff_gdal(ndarray_data, str_output_file, transform, projection, no_data=-1,
+    def array2tiff_gdal(ndarray_data, str_output_file, transform, projection, no_data=0,
                         compression='COMPRESS=PACKBITS'):
         """
         Given an input ndarray and the desired projection parameters, create a losslessly compressed raster.tif preserving the input dtype.

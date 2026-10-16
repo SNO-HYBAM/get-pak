@@ -574,7 +574,7 @@ class Pipelines:
             'maximum_physical_value': (
                 None if float32_contract else (
                     maximum_physical_value if maximum_physical_value is not None else
-                    (None if categorical else float((np.iinfo(resolved_dtype).max - 1) / stored_multiplier))
+                    (None if categorical else float(np.iinfo(resolved_dtype).max / stored_multiplier))
                 )
             ),
             'acquisition_datetime_utc': acquired['acquisition_datetime_utc'],
@@ -1882,6 +1882,8 @@ class Pipelines:
             with rasterio.open(path_to_tif) as source:
                 tags = source.tags()
                 nodata = source.nodata
+                # File NoData is authoritative, including legacy nonzero sentinels.
+                # Never substitute the current output setting for an existing file.
                 reader_scale = source.scales[0] if source.scales else None
                 reader_offset = source.offsets[0] if source.offsets else None
 
@@ -2012,9 +2014,10 @@ class Pipelines:
             f"{prefix}_roi_features_with_data": stats.get("roi_features_with_data"),
             f"{prefix}_encoding_version": version,
             f"{prefix}_encoding_profile": tags.get("ENCODING_PROFILE"),
-            f"{prefix}_physical_unit": (u.resolve_encoding_settings(dict(encoding_settings))["output_encoding"]["owt_unit"]
-                                        if prefix == "Turb" and encoding_settings is not None
-                                        else tags.get("PHYSICAL_UNIT")),
+            f"{prefix}_physical_unit": (tags.get("PHYSICAL_UNIT") or
+                (u.resolve_encoding_settings({
+                    "processing": (encoding_settings or {}).get("processing", {})
+                })["output_encoding"]["owt_unit"] if prefix == "Turb" else None)),
             f"{prefix}_applied_multiplier": stored_multiplier,
             f"{prefix}_decode_multiplier": decode_multiplier,
             f"{prefix}_decode_source": decode_source,

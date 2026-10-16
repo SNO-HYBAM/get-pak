@@ -106,15 +106,15 @@ Each run also writes a scene ledger named `<run>_scene_ledger.json`, a timing ma
 
 ## Raster values and no-data
 
-New rasters use encoding version `GETPAK-ENC-2`. Continuous products default to unsigned 32-bit rasters with `4294967295` as no-data; zero is a valid physical value. Categorical OWT products are unsigned 8-bit rasters with `255` as no-data; class zero is preserved when it is a valid class.
+New rasters use encoding version `GETPAK-ENC-2`. Continuous products default to unsigned 32-bit rasters with `0` as no-data. Physical zero and positive values rounding to stored zero become no-data (excluded from ROI counts and statistics). Categorical OWT products are unsigned 8-bit rasters with `0` as no-data; valid class codes are 1–255.
 
 | Product | Stored multiplier | Decode physical value | No-data | Unit |
 | --- | ---: | ---: | ---: | --- |
-| Rrs bands | 10,000 | stored value × 0.0001 | 2,147,483,648 | sr-1 |
-| Chlorophyll-a | 100 | stored value × 0.01 | 2,147,483,648 | mg m-3 |
-| Turb (OWT product) | 100 | stored value × 0.01 | 2,147,483,648 | NTU |
-| HySPM | 100 | stored value × 0.01 | 4,294,967,295 | mg L-1 |
-| OWT and OWTSPM | 1 | stored class code | 255 | class code |
+| Rrs bands | 10,000 | stored value × 0.0001 | 0 | sr-1 |
+| Chlorophyll-a | 100 | stored value × 0.01 | 0 | mg m-3 |
+| Turb (OWT product) | 100 | stored value × 0.01 | 0 | NTU |
+| HySPM | 100 | stored value × 0.01 | 0 | mg L-1 |
+| OWT and OWTSPM | 1 | stored class code | 0 | class code |
 
 The GeoTIFF stores its actual multiplier, zero offset, unit, no-data, product, encoding version/profile, valid range, overflow count, source acquisition time, tile, provenance identity, and source product name. A raw array reader must decode exactly once using the embedded metadata. If authoritative multiplier metadata is absent, GET-Pak uses the product multiplier from the same [output_encoding] dictionary and records that settings_fallback was used. Rasterio's generic default scale of 1.0 is not treated as explicit metadata. Invalid or contradictory embedded encoding metadata, including a nonzero offset, is an error. Do not apply continuous scaling to OWT classes. Values that are non-finite, invalid under the existing quality rules, or outside the representable physical range become no-data and are counted in the metadata.
 
@@ -122,7 +122,7 @@ The storage range protects against integer wraparound; it does not establish sci
 
 ## Encoding settings
 
-The optional [output_encoding] section is the only encoding configuration. When it is absent, the standard values below are used. Supplied multipliers must be finite and positive; continuous storage supports uint16 with 65535 no-data or uint32 with 4294967295 no-data, and categorical storage remains uint8 with 255 no-data.
+The optional [output_encoding] section is the only encoding configuration. When it is absent, the standard values below are used. Supplied multipliers must be finite and positive; continuous storage supports uint16 or uint32 with zero no-data, and categorical storage uses uint8 with zero no-data. Nonzero NoData settings must be migrated to zero for new outputs.
 
 ```ini
 [output_encoding]
@@ -132,12 +132,12 @@ chla_multiplier = 100
 turbidity_multiplier = 100
 hyspm_multiplier = 100
 continuous_dtype = uint32
-continuous_nodata = 4294967295
+continuous_nodata = 0
 categorical_dtype = uint8
-categorical_nodata = 255
+categorical_nodata = 0
 ```
 
-The effective profile, physical resolution (1 / multiplier), and maximum ((dtype maximum - 1) / multiplier) are shown when settings are read. Standard multipliers use profile standard; changed multipliers use profile custom under the same GETPAK-ENC-2 schema. For example, multiplier 5 supports 7000 mg L-1 at 0.2 mg L-1 resolution for HySPM, and multiplier 50 supports 1000 mg m-3 at 0.02 mg m-3 resolution for Chl-a. These are supported storage examples, not claims about retrieval validity.
+The effective profile, physical resolution (1 / multiplier), and maximum (dtype maximum / multiplier) are shown when settings are read. Standard multipliers use profile standard; changed multipliers use profile custom under the same GETPAK-ENC-2 schema. For example, multiplier 5 supports 7000 mg L-1 at 0.2 mg L-1 resolution for HySPM, and multiplier 50 supports 1000 mg m-3 at 0.02 mg m-3 resolution for Chl-a. These are supported storage examples, not claims about retrieval validity.
 
 ## OWT product presentation and compression
 
@@ -149,7 +149,7 @@ owt_product = turbidity
 
 `owt_product = turbidity` presents the existing OWT retrieval as Turbidity in NTU (default); `spm` presents the same values as SPM in mg L-1. This choice changes presentation and unit metadata only. It does not convert values, change the retrieval equations, or alter quality thresholds. The `Turb` folder and report keys remain stable; HySPM always uses mg L-1.
 
-GeoTIFFs use lossless LZW compression and tiling. Compression preserves encoded pixel values and metadata. Floating arrays retain their original dtype. Integer encoding still rounds to the nearest 1 / multiplier: at multiplier 100 its maximum rounding error is 0.005. The uint32 valid maximum at multiplier 100 is 42,949,672.94, avoiding the uint16 ×100 limit of 655.34. Existing uint16 files remain readable using their embedded scale and nodata metadata. When reading older files without scale metadata, explicitly configure their original multiplier.
+GeoTIFFs use lossless LZW compression and tiling. Compression preserves encoded pixel values and metadata. Floating arrays retain their original dtype. Integer encoding still rounds to the nearest 1 / multiplier: at multiplier 100 its maximum rounding error is 0.005. The uint32 valid maximum at multiplier 100 is 42,949,672.95, avoiding the uint16 ×100 limit of 655.35. Existing uint16/uint32 files remain readable using their embedded scale and NoData metadata, including maximum-integer sentinels and valid zero pixels. Embedded metadata takes precedence over settings.ini; contradictory metadata is an error. When reading older files without scale metadata, explicitly configure their original multiplier. Files without embedded NoData are rejected because their invalid pixels cannot be inferred safely. The encoding version remains GETPAK-ENC-2: inspect each file’s NoData, not the version alone. Signed custom Float32 products retain NaN NoData and valid physical zero.
 
 ## Reports
 

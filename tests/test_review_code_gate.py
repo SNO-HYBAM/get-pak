@@ -88,7 +88,7 @@ def write_mask(path, values, transform):
 def test_scaling_policy_round_trip_and_raster_metadata(tmp_path):
     values = np.array([np.nan, -1.0, 0.0, 0.1234, 1000.0, np.inf])
     encoded, metadata = Utils.to_uint16_scaled(
-        values, scale=100, unit='mg L-1', product='Turb',
+        values, scale=100, nodata=65535, unit='mg L-1', product='Turb',
         return_metadata=True,
     )
     assert encoded.tolist() == [65535, 65535, 0, 12, 65535, 65535]
@@ -375,8 +375,8 @@ def test_invalid_rrs_stays_invalid_and_zero_stays_valid():
 
 
 def test_uint16_rejects_nonreserved_nodata():
-    with pytest.raises(ValueError, match="nodata=65535"):
-        Utils.to_uint16_scaled(np.array([0.0, np.nan]), nodata=0)
+    with pytest.raises(ValueError, match="nodata=0 or legacy 65535"):
+        Utils.to_uint16_scaled(np.array([0.0, np.nan]), nodata=123)
 
 
 def test_static_mask_path_resolves_from_settings_directory(monkeypatch, tmp_path):
@@ -435,7 +435,7 @@ def test_pipeline_persists_pre_qc_diagnostics_and_invalid_outputs(monkeypatch, t
     assert result["rrs_diagnostics"]["Red"]["neg_count"] == 1
     assert result["rrs_diagnostics"]["Red"]["finite_count"] == 4
     with rasterio.open(result["Chla"]) as source:
-        assert source.nodata == 4294967295
+        assert source.nodata == 0
         assert source.read_masks(1)[0, 0] == 0
         assert source.read_masks(1)[0, 1] == 0
     assert "scene_rrs_Red_neg_count;1" in Path(result["npix"]).read_text()
