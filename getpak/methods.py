@@ -1092,7 +1092,7 @@ class Methods:
                 classes = [4]
                 index = np.where(np.isin(class_owt_spt, classes))
                 if len(index[0] > 0):
-                    turb[index] = ifunc.spm_binding2010(RedEdge2=rrs_dict['RedEdge2'].values[index])
+                    turb[index] = ifunc.spm_madeira(Red=rrs_dict['Red'].values[index], Nir2=rrs_dict['Nir2'].values[index])
 
                     if limits:
                         lims = [50, 2000]
