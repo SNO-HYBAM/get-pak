@@ -19,7 +19,7 @@ setup(
     url="https://github.com/SNO-HYBAM/get-pak",
     packages=find_packages(include=["getpak", "getpak.*"]),
     py_modules=['main'],
-    python_requires='>=3.10,<3.14',
+    python_requires='>=3.9,<3.14',
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
