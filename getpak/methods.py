@@ -1242,8 +1242,8 @@ class Methods:
         Parameters
         ----------
         @rrs_dict: rrs_dict: a xarray Dataset containing the Rrs bands
-        @owt_classes: an array with the different OWT classes calculated with function classify_owt_turb_weights
-        @owt_classes: an array with the OWT weights calculated with function classify_owt_turb_weights
+        @owt_classes: an array with the different OWT classes calculated with function classify_owt_spm_weights
+        @owt_classes: an array with the OWT weights calculated with function classify_owt_spm_weights
         @limits: boolean to choose whether to apply the limits for the different layers of turb products
 
         Returns
@@ -1287,6 +1287,60 @@ class Methods:
             sys.exit(1)
 
         return turb
+
+    def blended_spm(self, rrs_dict, owt_classes, owt_weights, limits=True):
+        """
+        Function to calculate a blended suspended particle matter (SPM) product based on turb matrices calculated with
+        function turb in mode 'owt'
+
+        Parameters
+        ----------
+        @rrs_dict: rrs_dict: a xarray Dataset containing the Rrs bands
+        @owt_classes: an array with the different OWT classes calculated with function classify_owt_spm_weights
+        @owt_classes: an array with the OWT weights calculated with function classify_owt_spm_weights
+        @limits: boolean to choose whether to apply the limits for the different layers of spm products
+
+        Returns
+        -------
+        @turb: an array, with the same size as the input bands, with the modeled values
+        """
+
+        if isinstance(owt_classes, np.ndarray) and len(owt_classes.shape) == 3:
+            # calculating turb for each
+            aux_spm = np.zeros((owt_classes.shape[0], *rrs_dict['Red'].shape), dtype='float32')
+            for i in range(0, owt_classes.shape[0]):
+                aux_spm[i, :, :] = Methods.turb(self, rrs_dict, owt_classes[i, :, :], limits=True, alg='owt')
+
+            # checking the limits
+            if limits:
+                for i in range(1, owt_classes.shape[0]):
+                    over = np.where((np.absolute(aux_spm[i, :, :] - aux_spm[0, :, :]) > (4 * aux_spm[0, :, :])))
+                    aux_spm[i, over[0], over[1]] = 0
+
+            # inserting weights = 0
+            for i in range(0, owt_classes.shape[0]):
+                owt_weights[i, np.where(np.isnan(aux_spm[i, :, :]))[0], np.where(np.isnan(aux_spm[i, :, :]))[1]] = 0
+                aux_spm[i, np.where(np.isnan(aux_spm[i, :, :]))[0], np.where(np.isnan(aux_spm[i, :, :]))[1]] = 0
+
+            # calculating the blended product
+            num = np.zeros(rrs_dict['Red'].shape, dtype='float32')
+            den = np.zeros(rrs_dict['Red'].shape, dtype='float32')
+            for i in range(0, owt_classes.shape[0]):
+                num = num + (owt_weights[i, :, :] * aux_spm[i, :, :])
+                den = den + owt_weights[i, :, :]
+            spm = num / den
+
+            # changing from np.nan to 0:
+            spm[np.where(np.isnan(spm))] = 0
+
+        elif isinstance(owt_classes, np.ndarray) and len(owt_classes.shape) == 3:
+            print('There is only one class of OWT, use function Methods.turb instead.')
+            sys.exit(1)
+        else:
+            print('Error: The vector of OWT classes has the wrong number of dimensions.')
+            sys.exit(1)
+
+        return spm
 
     @staticmethod
     def _quick_rrs(rrs_dict,bname='Red'):
