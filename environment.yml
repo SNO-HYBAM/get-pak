@@ -1,4 +1,4 @@
-name: getpak-review
+name: getpak
 channels:
   - conda-forge
 dependencies:
