@@ -1190,6 +1190,10 @@ class Pipelines:
                         owt_weights[1,mask] = 0
                         owt_weights[2,mask] = 0
 
+                    # OWT-SPM weights
+                    owt_spm_classes, owt_spm_weights = m.classify_owt_spm_weights(class_px=classes_turb,
+                                                                                        angles=angles_turb, n=2)
+                   
                     # n pixels    
                     pixels[3,1] = np.count_nonzero(owt_classes[0,:,:] == 1)
 
@@ -1229,7 +1233,8 @@ class Pipelines:
 
                     # calculating the legacy-named OWT-SPM product
                     print(f"Calculating OWT-{self.encoding_settings['output_encoding']['owt_product']}...")
-                    turb = m.turb(rrs_dict=grs, class_owt_spt=classes_turb, alg='owt', limits=True)
+                    turb = m.blended_turb(rrs_dict=grs, owt_classes=owt_spm_classes,
+                                          owt_weights=owt_spm_weights, limits=True)
 
                     # calculating SPM_S3
                     print(f'Calculating Hybrid-SPM...')
